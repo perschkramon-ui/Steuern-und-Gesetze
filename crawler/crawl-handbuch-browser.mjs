@@ -85,6 +85,23 @@ if (fs.existsSync(errFile)) {
     console.log(`${retry.length} fehlgeschlagene URLs erneut eingereiht`);
   }
 }
+// Enqueue-Dedupe: bisher wurde jede URL so oft eingereiht, wie sie verlinkt
+// ist (Dedupe erst beim Pop) – bei den stark vernetzten Handbüchern wächst die
+// Queue damit auf Hunderttausende Duplikate (Empirie ao 2026-07-16: 139k
+// Einträge bei 219 besuchten Seiten) und macht state.json (synchroner
+// Voll-Write alle 20 Seiten) und RAM unbrauchbar groß. Jede URL kommt jetzt
+// höchstens EINMAL in die Queue; Bestands-Queues aus altem State werden beim
+// Laden dedupliziert. (normalize ist als function declaration gehoisted.)
+{
+  const seen = new Set();
+  queue = queue.filter((q) => {
+    const n = normalize(q.url);
+    if (!n || seen.has(n)) return false;
+    seen.add(n);
+    return true;
+  });
+}
+const enqueued = new Set(queue.map((q) => normalize(q.url)));
 const saveState = () => fs.writeFileSync(stateFile, JSON.stringify({ visited: [...visited], queue }));
 
 // SYNCHRONE Appends statt WriteStreams: die Abbruch-Pfade (process.exit bei
@@ -430,8 +447,9 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
       blocks = 0;
       for (const l of ex.links) {
         const child = normalize(l.href, finalUrl);
-        if (!child || visited.has(child)) continue;
+        if (!child || visited.has(child) || enqueued.has(child)) continue;
         if (!classify(child)) continue;
+        enqueued.add(child);
         queue.push({ url: child, from: norm, linkText: l.txt });
       }
     }
