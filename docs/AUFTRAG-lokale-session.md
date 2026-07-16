@@ -57,8 +57,17 @@ BMF-Crawl schon erfolgreich gefahren hat; adversarial reviewt 2026-07-16,
 26 Funde gefixt). Eigenschaften:
 
 - Playwright/Chromium, löst die Radware-Challenge (Same-URL- UND
-  Redirect-Variante), behält Cookies; nach „kein PDF" wird die Session
-  automatisch neu etabliert.
+  Redirect-Variante). **Session-Recycling** (Empirie lokaler Lauf 2026-07-16):
+  Radware flaggt jede Browser-Session nach ~70 Seiten/~25 Min dauerhaft –
+  der Crawler wirft die Session deshalb proaktiv alle 45 Seiten/10 Min weg
+  (frischer Context, Challenge wird neu gelöst) und nach jedem BOTBLOCK
+  reaktiv; Weiter-Navigieren mit geflaggten Cookies bleibt sonst dauerhaft
+  geblockt.
+- **Akkordeons werden aufgeklappt** (Fund 2026-07-16): Die Handbuch-Seiten
+  verstecken AEAO/Richtlinien/Hinweise/KassenSichV hinter „aufklappen"-
+  Toggles; ohne Aufklappen liest die innerText-Extraktion NUR den
+  Gesetzestext (§146a: 5k statt 94k Zeichen). Ein Wächter warnt laut, wenn
+  eine Seite trotzdem viel verstecktes DOM behält.
 - **robots.txt-Prüfung eingebaut** (Hausregel): Disallow-Regeln (`User-agent: *`
   UND KI-Bot-Gruppen, inkl. `*`/`$`-Wildcards) werden beachtet; ein
   KI-/TDM-Vorbehalt (§ 44b Abs. 3 UrhG, z. B. claudebot mit `Disallow: /`)
@@ -106,6 +115,29 @@ erhöhen. `*-cache/` ist gitignored – Caches bleiben lokal.
 Falls die Ausgaben-Erkennung nicht greift (Warnung „crawle den GANZEN Host"):
 abbrechen und `--prefix /<kürzel>/<jahr>/` explizit setzen (im Browser
 nachsehen, z. B. `/ao/2026/`).
+
+### Beschleunigung: mehrere PCs / parallele Ketten (optional)
+
+Die 7 Handbücher sind 7 GETRENNTE Hosts – die Höflichkeits-Drossel gilt je
+Host. Sie dürfen deshalb **parallel** gecrawlt werden, auf einem PC (mehrere
+Terminals) oder verteilt auf mehrere PCs:
+
+- **Aufteilung nach Handbüchern**, z. B. PC 1: `ao,usth,ksth` · PC 2:
+  `esth,lsth,gewsth,erbsth` (dick: AO/ESt/USt/LSt, dünn: K/Gew/Erb).
+  Je PC einmalig: Repo-Klon + Werkzeug-Ordner (s. Voraussetzungen).
+- **NIE dasselbe Handbuch auf zwei PCs**: kein gemeinsamer `state.json` →
+  doppelte Arbeit, und zusammen verletzen sie die Pro-Host-Drossel.
+- **Faustregel Parallelität je PC:** höchstens (CPU-Kerne − 1)
+  Chromium-Instanzen; ein 2-Kern-Laptop schafft 2 Ketten (3 Instanzen
+  machten ihn 2026-07-16 messbar LANGSAMER als sequenziell).
+- **Zusammenführen:** die `*-handbuch-cache/`-Ordner sind einfache
+  Verzeichnisse – nach den FERTIG-Zeilen auf den Build-PC kopieren, dann
+  wie unten `update-all.mjs` laufen lassen.
+- **NICHT auf BZSt/RII übertragen:** BZSt-`Crawl-delay: 30` ist als
+  Gesamt-Rate des Servers zu lesen (zwei PCs = Umgehung statt Einhaltung),
+  und bei RII ist die moderate Rate Teil der dokumentierten Begründung des
+  robots-Override – verteiltes Crawlen würde genau diese Grundlage
+  aufweichen.
 
 ## Danach: Register neu bauen – über update-all (der EINE Weg)
 
