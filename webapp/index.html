@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧾</text></svg>">
+<title>Steuerberater KI – Steuerrecht-Register</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1b2430; --muted: #5b6675;
+    --accent: #0b5fff; --accent-soft: #e8efff; --border: #dfe4ea;
+    --ok: #0a7d33; --ok-soft: #e4f5ea; --warn: #8a5a00; --warn-soft: #fff3d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #10151c; --card: #1a212b; --text: #e8edf4; --muted: #9aa7b5;
+      --accent: #6ea2ff; --accent-soft: #1e2c48; --border: #2c3644;
+      --ok: #5ad48a; --ok-soft: #14301f; --warn: #ffd479; --warn-soft: #3a2f12;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 80px; }
+  header h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  header p { margin: 0 0 18px; color: var(--muted); font-size: .92rem; }
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .searchrow { display: flex; gap: 8px; flex-wrap: wrap; }
+  .searchrow input { flex: 1 1 260px; min-width: 0; padding: 12px 14px; font-size: 1.05rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); }
+  .searchrow input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  button { padding: 12px 18px; font-size: 1rem; border: 0; border-radius: 10px; background: var(--accent); color: #fff; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .chip { padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text); font-size: .85rem; cursor: pointer; }
+  .chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .stats { color: var(--muted); font-size: .85rem; margin-top: 10px; }
+  .hit { padding: 12px 4px; border-top: 1px solid var(--border); }
+  .hit:first-child { border-top: 0; }
+  .hit a.title { color: var(--accent); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+  .hit a.title:hover { text-decoration: underline; }
+  .meta { font-size: .8rem; color: var(--muted); margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .badge { padding: 1px 8px; border-radius: 999px; font-size: .72rem; font-weight: 600; }
+  .badge.amtlich { background: var(--ok-soft); color: var(--ok); }
+  .badge.kind { background: var(--accent-soft); color: var(--accent); }
+  .badge.topic { background: var(--warn-soft); color: var(--warn); }
+  select.chip { appearance: auto; max-width: 100%; }
+  .summary { font-size: .9rem; color: var(--text); margin-top: 4px; overflow-wrap: anywhere; }
+  .more { margin-top: 12px; width: 100%; background: var(--accent-soft); color: var(--accent); }
+  #answer { white-space: pre-wrap; overflow-wrap: anywhere; }
+  #answer .src { display: block; margin-top: 4px; }
+  .note { font-size: .82rem; color: var(--muted); }
+  .note a { color: var(--accent); }
+  .kihead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .kihead h2 { font-size: 1.1rem; margin: 0 0 10px; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--accent-soft); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .answerbox { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; display: none; }
+  .sources { margin: 10px 0 0; padding-left: 18px; font-size: .9rem; }
+  .sources a { color: var(--accent); overflow-wrap: anywhere; }
+  .offline { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: 10px 12px; font-size: .88rem; display: none; }
+  footer { margin-top: 24px; font-size: .8rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🧾 Steuerberater KI – Steuerrecht-Register</h1>
+    <p id="buildInfo">Register wird geladen …</p>
+  </header>
+
+  <div class="panel">
+    <div class="kihead"><h2>Frage an die KI</h2><span class="note">Antwortet ausschließlich aus dem Register – jede Antwort mit Quellen-Links. Findet sie keine Quelle, sagt sie das.</span></div>
+    <div class="searchrow">
+      <input id="q_ki" type="text" placeholder="z. B. Wie lange müssen Kassenbelege aufbewahrt werden?" autocomplete="off">
+      <button id="askBtn">KI fragen</button>
+    </div>
+    <div class="offline" id="kiOffline">
+      Der KI-Server läuft nicht. Starten: <code>node server/server.mjs</code> im Ordner <code>steuerberater-ki</code>
+      (einmalig <code>server/.env.local</code> mit <code>GEMINI_API_KEY</code> anlegen – siehe README). Die Register-Suche unten funktioniert auch ohne Server.
+    </div>
+    <div class="answerbox" id="answerBox">
+      <div id="answer"></div>
+      <ol class="sources" id="sources"></ol>
+      <div class="note" id="answerMeta"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="kihead"><h2>Register durchsuchen</h2><span class="note">rein lokal, ohne Server – findet Gesetze, §§, BMF-Seiten und BMF-Schreiben</span></div>
+    <div class="searchrow">
+      <input id="q" type="text" placeholder="z. B. § 146a AO · Kassen-Nachschau · Aufbewahrungsfristen · GoBD" autocomplete="off">
+    </div>
+    <div class="chips" id="chips">
+      <button class="chip on" data-kind="">Alles</button>
+      <button class="chip" data-kind="norm">§§ Steuergesetze</button>
+      <button class="chip" data-kind="gesetz">Gesetzes-Index</button>
+      <button class="chip" data-kind="seite">Amtliche Seiten</button>
+      <button class="chip" data-kind="pdf">PDFs & Schreiben</button>
+      <button class="chip" data-kind="urteil">⚖️ Urteile</button>
+      <button class="chip" data-kind="kommend">⏳ Kommend</button>
+      <select id="topicSelect" class="chip" title="Nach Thema/Rubrik filtern (aus der amtlichen URL-Struktur abgeleitet)">
+        <option value="">Alle Themen</option>
+      </select>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div id="results"></div>
+    <button class="more" id="moreBtn" style="display:none">Mehr anzeigen</button>
+  </div>
+
+  <div class="panel note">
+    Externe Nachschlagewerke (werden nicht ins Register übernommen):
+    <a href="https://www.smartsteuer.de/online/lexikon/" target="_blank" rel="noopener">smartsteuer-Lexikon öffnen ↗</a> ·
+    <a href="https://www.bundesfinanzministerium.de/Web/DE/Themen/Steuern/steuern.html" target="_blank" rel="noopener">BMF Steuern ↗</a> ·
+    <a href="https://www.gesetze-im-internet.de/" target="_blank" rel="noopener">Gesetze im Internet ↗</a>
+    <br>Hinweis: Das smartsteuer-Lexikon untersagt die Übernahme in KI-Wissensbasen (robots.txt, §44b UrhG) – deshalb hier nur der Link.
+  </div>
+
+  <footer>
+    Alle Registerinhalte stammen aus amtlichen Quellen (BMF, gesetze-im-internet.de) und tragen Stand/Abrufdatum.
+    Dieses Werkzeug ersetzt keine Steuerberatung; rechtsverbindlich sind allein die verlinkten Originalquellen.
+  </footer>
+</div>
+
+<script src="../data/register.js"></script>
+<script src="../data/normen-register.js"></script>
+<script>
+(function () {
+  'use strict';
+  var REG = window.STEUER_REGISTER || { meta: { counts: {} }, entries: [] };
+  var KI_URL = (location.protocol === 'file:' ? 'http://localhost:8787' : '') + '/api/ask';
+
+  // ---------- Anzeige Kopfzeile ----------
+  var c = REG.meta.counts || {};
+  document.getElementById('buildInfo').textContent =
+    (REG.entries.length ? REG.entries.length.toLocaleString('de-DE') : 'Keine') + ' Einträge · ' +
+    (c.normen || 0).toLocaleString('de-DE') + ' §§-Normen · ' +
+    (c.gesetzeIndex || 0).toLocaleString('de-DE') + ' Gesetze im Index · ' +
+    (c.seiten || c.bmfSeiten || 0).toLocaleString('de-DE') + ' amtliche Seiten · ' +
+    (c.pdfs || c.bmfPdfs || 0).toLocaleString('de-DE') + ' PDFs/Schreiben' +
+    (c.kommend ? ' · ⏳ ' + c.kommend.toLocaleString('de-DE') + ' kommende Änderungen' : '') +
+    ' · Stand: ' + (REG.meta.built ? new Date(REG.meta.built).toLocaleDateString('de-DE') : '–') +
+    (REG.meta.lastUpdate ? ' · seit letzter Aktualisierung: +' + REG.meta.lastUpdate.neu.toLocaleString('de-DE') + ' neu, ' + REG.meta.lastUpdate.geaendert.toLocaleString('de-DE') + ' geändert' : '');
+
+  // ---------- Suche ----------
+  function fold(s) {
+    // Umlaute + Bindestriche falten, damit „kassennachschau" auch
+    // „Kassen-Nachschau" findet (Query und Haystack identisch behandelt).
+    return (s || '').toLowerCase()
+      .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+      .replace(/(\w)-(\w)/g, '$1$2')
+      .replace(/§\s+/g, '§');
+  }
+  var KIND_LABEL = { gesetz: 'Gesetz', norm: '§ Norm', seite: 'Amtliche Seite', pdf: 'PDF/Schreiben', kommend: '⏳ Kommende Änderung', bmf: 'BMF-Seite', 'bmf-pdf': 'BMF-PDF' };
+  var hay = REG.entries.map(function (e) {
+    return { e: e, t: fold(e.title), s: fold(e.summary || '') };
+  });
+
+  var state = { kind: '', topic: '', shown: 50, hits: [] };
+
+  // Themen-Auswahl dynamisch aus den Daten füllen (häufigste zuerst)
+  function fillTopics() {
+    var counts = {};
+    REG.entries.forEach(function (e) { if (e.topic) counts[e.topic] = (counts[e.topic] || 0) + 1; });
+    var sel = document.getElementById('topicSelect');
+    while (sel.options.length > 1) sel.remove(1); // Platzhalter behalten
+    Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; }).forEach(function (t) {
+      var o = document.createElement('option');
+      o.value = t; o.textContent = t + ' (' + counts[t].toLocaleString('de-DE') + ')';
+      sel.appendChild(o);
+    });
+    if (state.topic) sel.value = state.topic;
+  }
+  fillTopics();
+  document.getElementById('topicSelect').addEventListener('change', function () {
+    state.topic = this.value;
+    state.hits = search(document.getElementById('q').value); state.shown = 50; render();
+  });
+
+  // ---------- §-Karteikarten ALLER Gesetze (Lazy-Blob) ----------
+  // normen-register.js liefert die Nicht-Steuer-Normen als gzip+base64
+  // (Klartext wäre ~10× register.js). Entpacken im Hintergrund nach dem
+  // ersten Paint; danach sind alle ~100k §§ als Einträge such-/filterbar.
+  (function () {
+    if (!window.STEUER_NORMEN_B64) return;
+    function merge(list) {
+      list.forEach(function (e) {
+        REG.entries.push(e);
+        hay.push({ e: e, t: fold(e.title), s: '' });
+      });
+      fillTopics();
+      var q = document.getElementById('q').value;
+      if (q) { state.hits = search(q); render(); }
+      var info = document.getElementById('buildInfo');
+      info.textContent = REG.entries.length.toLocaleString('de-DE') + ' Einträge (inkl. §§ aller Gesetze) · ' + info.textContent.split(' Einträge · ').slice(1).join(' Einträge · ');
+    }
+    function decode() {
+      try {
+        if (typeof DecompressionStream === 'undefined') {
+          console.warn('DecompressionStream fehlt – §§-Karteikarten der übrigen Gesetze nicht verfügbar (Browser zu alt); KI-Suche deckt sie trotzdem ab.');
+          return;
+        }
+        var bin = atob(window.STEUER_NORMEN_B64);
+        var bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        window.STEUER_NORMEN_B64 = ''; // Speicher freigeben
+        new Response(new Response(bytes).body.pipeThrough(new DecompressionStream('gzip'))).text()
+          .then(function (txt) { merge(JSON.parse(txt)); })
+          .catch(function (err) { console.warn('Normen-Blob nicht entpackbar:', err); });
+      } catch (err) { console.warn('Normen-Blob nicht ladbar:', err); }
+    }
+    setTimeout(decode, 250); // erst rendern, dann entpacken
+  })();
+
+  function search(qRaw) {
+    var q = fold(qRaw).trim();
+    if (!q) return [];
+    var tokens = q.split(/[\s,;/]+/).filter(Boolean);
+    if (!tokens.length) return [];
+    var out = [];
+    for (var i = 0; i < hay.length; i++) {
+      var h = hay[i];
+      if (state.kind && h.e.kind !== state.kind) continue;
+      if (state.topic && h.e.topic !== state.topic) continue;
+      var score = 0, ok = true;
+      for (var j = 0; j < tokens.length; j++) {
+        var tok = tokens[j];
+        var inTitle = h.t.indexOf(tok) !== -1;
+        var inSum = !inTitle && h.s.indexOf(tok) !== -1;
+        if (!inTitle && !inSum) { ok = false; break; }
+        score += inTitle ? 3 : 1;
+        // Wortanfang im Titel wiegt mehr
+        if (inTitle && new RegExp('(^|[^a-z0-9§])' + tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(h.t)) score += 2;
+      }
+      if (!ok) continue;
+      // §-Treffer priorisieren, kurze Titel (= präzisere Treffer) leicht bevorzugen
+      if (h.e.kind === 'norm') score += 1;
+      score -= Math.min(1, h.t.length / 400);
+      out.push({ score: score, e: h.e });
+    }
+    out.sort(function (a, b) { return b.score - a.score; });
+    return out;
+  }
+
+  function esc(s) { return String(s || '').replace(/[&<>"]/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]; }); }
+
+  function render() {
+    var res = document.getElementById('results');
+    var slice = state.hits.slice(0, state.shown);
+    res.innerHTML = slice.map(function (h) {
+      var e = h.e;
+      return '<div class="hit">' +
+        '<a class="title" href="' + esc(e.url) + '" target="_blank" rel="noopener">' + esc(e.title) + '</a>' +
+        '<div class="meta">' +
+          '<span class="badge kind">' + esc(KIND_LABEL[e.kind] || e.kind) + '</span>' +
+          (e.amtlich ? '<span class="badge amtlich">amtlich</span>' : '') +
+          (e.topic ? '<span class="badge topic">' + esc(e.topic) + '</span>' : '') +
+          '<span>' + esc(e.source) + '</span>' +
+          (e.date ? '<span>Datum: ' + esc(e.date) + '</span>' : '') +
+          (e.stand ? '<span>' + esc(e.stand) + '</span>' : '') +
+        '</div>' +
+        (e.summary ? '<div class="summary">' + esc(e.summary) + '</div>' : '') +
+        '</div>';
+    }).join('');
+    document.getElementById('stats').textContent = state.hits.length
+      ? state.hits.length.toLocaleString('de-DE') + ' Treffer'
+      : (document.getElementById('q').value.trim() ? 'Keine Treffer.' : '');
+    document.getElementById('moreBtn').style.display = state.hits.length > state.shown ? 'block' : 'none';
+  }
+
+  var debounce;
+  document.getElementById('q').addEventListener('input', function () {
+    clearTimeout(debounce);
+    var v = this.value;
+    debounce = setTimeout(function () { state.hits = search(v); state.shown = 50; render(); }, 120);
+  });
+  document.getElementById('moreBtn').addEventListener('click', function () { state.shown += 100; render(); });
+  document.getElementById('chips').addEventListener('click', function (ev) {
+    var b = ev.target.closest('.chip'); if (!b) return;
+    this.querySelectorAll('.chip').forEach(function (x) { x.classList.remove('on'); });
+    b.classList.add('on');
+    state.kind = b.getAttribute('data-kind') || '';
+    state.hits = search(document.getElementById('q').value); state.shown = 50; render();
+  });
+
+  // ---------- KI-Abfrage ----------
+  var askBtn = document.getElementById('askBtn');
+  function ask() {
+    var q = document.getElementById('q_ki').value.trim();
+    if (!q) return;
+    askBtn.disabled = true;
+    askBtn.innerHTML = '<span class="spinner"></span>';
+    document.getElementById('kiOffline').style.display = 'none';
+    var box = document.getElementById('answerBox');
+    // Zugangscode (öffentlich gehosteter Dienst): bei 401 einmal erfragen,
+    // lokal merken, Anfrage wiederholen.
+    var kiHeaders = { 'Content-Type': 'application/json' };
+    try { var code = localStorage.getItem('ki_access_code'); if (code) kiHeaders['x-ki-code'] = code; } catch (e) {}
+    fetch(KI_URL, {
+      method: 'POST', headers: kiHeaders,
+      body: JSON.stringify({ question: q }),
+    }).then(function (r) {
+      if (r.status === 401) {
+        var neu = prompt('Zugangscode für die KI-Abfrage:');
+        if (neu) {
+          try { localStorage.setItem('ki_access_code', neu.trim()); } catch (e) {}
+          askBtn.disabled = false; askBtn.textContent = 'Fragen';
+          return ask(), new Promise(function () {});
+        }
+        throw new Error('Zugangscode erforderlich.');
+      }
+      if (!r.ok) return r.json().then(function (j) { throw new Error(j && j.error || ('HTTP ' + r.status)); });
+      return r.json();
+    }).then(function (j) {
+      box.style.display = 'block';
+      document.getElementById('answer').textContent = j.answer || '(leer)';
+      document.getElementById('sources').innerHTML = (j.sources || []).map(function (s) {
+        return '<li><a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.title) + '</a>' +
+          (s.amtlich ? ' <span class="badge amtlich">amtlich</span>' : '') + '</li>';
+      }).join('');
+      document.getElementById('answerMeta').textContent =
+        'Provider: ' + (j.provider || '?') + ' · Antwort ausschließlich aus den ' + (j.sources ? j.sources.length : 0) + ' verlinkten Registerquellen.' +
+        (j.verified === false ? ' ⚠️ Hinweis: Link-Verifikation meldete Abweichungen.' : '');
+    }).catch(function (e) {
+      if (/Failed to fetch|NetworkError|Load failed/i.test(String(e))) {
+        document.getElementById('kiOffline').style.display = 'block';
+      } else {
+        box.style.display = 'block';
+        document.getElementById('answer').textContent = 'Fehler: ' + e.message;
+        document.getElementById('sources').innerHTML = '';
+        document.getElementById('answerMeta').textContent = '';
+      }
+    }).finally(function () {
+      askBtn.disabled = false; askBtn.textContent = 'KI fragen';
+    });
+  }
+  askBtn.addEventListener('click', ask);
+  document.getElementById('q_ki').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') ask(); });
+})();
+</script>
+</body>
+</html>
