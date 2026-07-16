@@ -424,6 +424,17 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
       // Jeder Toggle wird höchstens EINMAL geklickt (data-Guard, sonst würde
       // ein zweiter Klick wieder zuklappen); mehrere Runden nur für verschach-
       // telte Akkordeons. Nav-/Menü-Toggles sind ausgenommen (closest nav/…).
+      // Aufklappen + Extraktion in EINER In-Place-Retry-Schleife: ein
+      // null-DOM (Seite noch am Settlen bei großen UStAE-§§ wie 12/24/25a)
+      // führte sonst sofort zu NOROOT und – bei zweitem Fehlschlag – zum
+      // stillen Verlust der Seite (Fund 2026-07-16: 10 usth-§§ verloren).
+      // Bis zu 3 Versuche mit Settle-Wartezeit, BEVOR NOROOT geworfen wird.
+      let ex = null;
+      for (let attempt = 0; attempt < 3 && !ex; attempt++) {
+        if (attempt > 0) {
+          await page.waitForLoadState('domcontentloaded').catch(() => {});
+          await page.waitForTimeout(700 + attempt * 500);
+        }
       for (let round = 0; round < 4; round++) {
         const clicked = await page.evaluate(() => {
           const root = document.querySelector('main') || document.querySelector('article')
@@ -465,7 +476,7 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
       }
       // Extraktion IM Browser (robust gegen unbekanntes Markup): Titel, H1,
       // Description, Datum, Haupttext (main > article > #content > body), Links.
-      const ex = await page.evaluate(() => {
+      ex = await page.evaluate(() => {
         const pickMeta = (sel) => (document.querySelector(sel) || {}).content || '';
         // ERST Links + H1 einsammeln (können in nav/header stehen – die werden gleich entfernt)
         const links = Array.from(document.querySelectorAll('a[href]')).map((a) => ({ href: a.href, txt: (a.innerText || '').trim().slice(0, 120) }));
@@ -486,9 +497,10 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
         // weiterhin zugeklappte Inhalte (Regel „keine stillen Deckel")
         const tcLen = (root.textContent || '').replace(/\s+/g, ' ').length;
         return { title: document.title || '', h1, description: pickMeta('meta[name="description"]'), date, text, links, tcLen };
-      });
-      // Dokument war mid-navigation (kein root) → als retriable behandeln:
-      // requeuen und Session neu (wie BOTBLOCK), NIE die Seite still verlieren.
+      }).catch(() => null);
+      } // Ende In-Place-Retry-Schleife
+      // Nach 3 Versuchen immer noch kein DOM → als retriable behandeln
+      // (requeuen, kurze Pause), NIE die Seite still verlieren.
       if (!ex) throw new Error(`NOROOT: ${norm}`);
       if (ex.tcLen > 20000 && ex.text.length < ex.tcLen / 5) {
         console.warn(`⚠️ Versteckter Inhalt vermutet (sichtbar ${ex.text.length} von ~${ex.tcLen} Zeichen): ${norm}`);
