@@ -126,4 +126,44 @@ const sites = ['bmf=../bmf-cache', 'bmf-alt=../bmf-restored-cache', 'bmjv=../bmj
 run('build-register.mjs', '--gii', '../gii-cache', '--sites', sites.join(','), '--out', '../data');
 run('bundle-offline.mjs');
 
+// 6. Handbuch-Stand pflegen + ERINNERUNGS-WÄCHTER (Betreiber 2026-07-16:
+//    „wird auch automatisch erinnert, dass der Lauf erneuert werden muss?").
+//    Die Handbücher kann NUR der lokale PC crawlen (Radware); das Restore
+//    stempelt fetchedAt aufs Build-Datum um – als dauerhafter Anker des
+//    letzten ECHTEN Crawls dient deshalb data/handbuch-stand.json (committet,
+//    überlebt jede Cache-Rekonstruktion). Nur ein FRISCHER lokaler Cache
+//    aktualisiert den Eintrag; die Wochen-Routine warnt ab HANDBUCH_MAX_TAGE
+//    laut – die Warnung gehört in den PR-Text, damit der Betreiber sie sieht.
+const standFile = path.join(ROOT, 'data', 'handbuch-stand.json');
+let hbStand = {};
+try { hbStand = JSON.parse(fs.readFileSync(standFile, 'utf8')); } catch { /* Erstlauf */ }
+for (const k of HANDBUCH_KUERZEL) {
+  const pj = path.join(ROOT, `${k}-handbuch-cache`, 'pages.jsonl');
+  if (!fs.existsSync(pj)) continue; // kein frischer Crawl auf dieser Maschine
+  let latest = '', ausgabe = '';
+  for (const line of fs.readFileSync(pj, 'utf8').split('\n')) {
+    const f = /"fetchedAt":"([^"]+)"/.exec(line);
+    if (f && f[1] > latest) latest = f[1];
+    if (!ausgabe) {
+      const m = new RegExp(`bundesfinanzministerium\\.de(/${k}/(?:19|20)\\d\\d/)`).exec(line);
+      if (m) ausgabe = m[1];
+    }
+  }
+  if (latest) hbStand[k] = { ausgabe: ausgabe || (hbStand[k] && hbStand[k].ausgabe) || '', zuletztGecrawlt: latest };
+}
+fs.writeFileSync(standFile, JSON.stringify(hbStand, null, 2) + '\n');
+const HANDBUCH_MAX_TAGE = 350; // Jahres-Ausgaben-Rhythmus, mit Puffer
+const faellig = HANDBUCH_KUERZEL.filter((k) => {
+  const s = hbStand[k];
+  if (!s || !s.zuletztGecrawlt) return true;
+  return (Date.now() - Date.parse(s.zuletztGecrawlt)) / 86400000 > HANDBUCH_MAX_TAGE;
+});
+if (faellig.length) {
+  console.warn(`\n⚠️ HANDBUCH-ERINNERUNG (in den PR-Text übernehmen!): Der letzte lokale ` +
+    `Handbuch-Crawl liegt über ${HANDBUCH_MAX_TAGE} Tage zurück oder fehlt für: ` +
+    faellig.map((k) => `${k} (${(hbStand[k] && hbStand[k].ausgabe) || 'nie gecrawlt'}, Stand ${((hbStand[k] && hbStand[k].zuletztGecrawlt) || 'unbekannt').slice(0, 10)})`).join(', ') +
+    '. Im Browser prüfen, ob eine neue Jahres-Ausgabe erschienen ist, und den lokalen ' +
+    'Crawl fahren (docs/AUFTRAG-lokale-session.md, Abschnitt Durchführung).');
+}
+
 console.log('\nUpdate abgeschlossen. Änderungsübersicht: data/changelog.json');

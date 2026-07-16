@@ -358,3 +358,11 @@ einfach wiederholen (`/MIR` spiegelt).
    Handbuch-Caches ab dann selbst aus `data/` (Schritt 0) und nimmt sie in
    jeden Build. Ohne diesen Mechanismus hätte der nächste Routine-Lauf die
    Handbuch-Inhalte wieder gelöscht (Review-Fund 2026-07-16).
+6. **Automatische Erinnerung an den nächsten Handbuch-Crawl:** eingebaut
+   (Betreiber 2026-07-16). `data/handbuch-stand.json` hält je Handbuch
+   Ausgabe + Datum des letzten ECHTEN lokalen Crawls (nur ein frischer
+   `*-handbuch-cache` aktualisiert den Eintrag – das Restore stempelt
+   fetchedAt um und zählt deshalb bewusst NICHT). Ist ein Stand älter als
+   350 Tage, warnt jede Wochen-Routine laut im Abschluss-Output
+   („HANDBUCH-ERINNERUNG … in den PR-Text übernehmen") → der Betreiber
+   sieht es im Montags-Draft-PR und stößt diese lokale Session erneut an.
