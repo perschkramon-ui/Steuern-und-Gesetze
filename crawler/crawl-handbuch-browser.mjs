@@ -428,6 +428,20 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
         const clicked = await page.evaluate(() => {
           const root = document.querySelector('main') || document.querySelector('article')
             || document.querySelector('#content') || document.body;
+          if (!root) return 0;
+          // Die Toggles sind <a>-Anker MIT href (Progressive Enhancement):
+          // el.click() folgt dem href und NAVIGIERT die Seite weg → die
+          // Extraktion lief danach gegen ein Dokument ohne <body> und warf
+          // „Cannot read properties of null" (Fund 2026-07-16: 26/50 §§-Seiten
+          // je Handbuch verloren). Capture-Guard: die Default-Anker-Navigation
+          // wird unterbunden, der JS-Handler des Akkordeons läuft weiter.
+          if (!window.__hbGuard) {
+            window.__hbGuard = true;
+            document.addEventListener('click', (e) => {
+              const a = e.target.closest && e.target.closest('a');
+              if (a) e.preventDefault();
+            }, true);
+          }
           let n = 0;
           for (const el of root.querySelectorAll('[aria-expanded="false"], details:not([open]) summary')) {
             if (el.closest('nav, header, footer')) continue;
@@ -449,6 +463,7 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
         const h1 = ((document.querySelector('h1') || {}).innerText || '').trim();
         const root = document.querySelector('main') || document.querySelector('article')
           || document.querySelector('#content') || document.body;
+        if (!root) return null; // Dokument mid-navigation → Aufrufer requeued
         // Störer im LIVE-DOM entfernen und innerText vom GERENDERTEN Knoten
         // lesen: innerText eines detached Clones fällt per HTML-Spec auf
         // textContent zurück und verliert alle Layout-Zeilenumbrüche –
@@ -463,6 +478,9 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
         const tcLen = (root.textContent || '').replace(/\s+/g, ' ').length;
         return { title: document.title || '', h1, description: pickMeta('meta[name="description"]'), date, text, links, tcLen };
       });
+      // Dokument war mid-navigation (kein root) → als retriable behandeln:
+      // requeuen und Session neu (wie BOTBLOCK), NIE die Seite still verlieren.
+      if (!ex) throw new Error(`NOROOT: ${norm}`);
       if (ex.tcLen > 20000 && ex.text.length < ex.tcLen / 5) {
         console.warn(`⚠️ Versteckter Inhalt vermutet (sichtbar ${ex.text.length} von ~${ex.tcLen} Zeichen): ${norm}`);
       }
@@ -488,7 +506,15 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
     nErr++;
     const msg = String(e && e.message || e);
     errOut.write(JSON.stringify({ url: norm, from: item.from, error: msg }) + '\n');
-    if (/BOTBLOCK|kein PDF/.test(msg)) {
+    // NOROOT / navigation-destroyed context / transiente evaluate-Fehler:
+    // EINMAL sofort neu einreihen (kurze Pause), damit keine §§-Seite still
+    // verloren geht (Fund 2026-07-16). Kein Session-Reset nötig – die
+    // Challenge ist gelöst, nur der DOM war mid-navigation.
+    if (/NOROOT|Execution context was destroyed|reading 'querySelectorAll'/.test(msg) && !item._retried) {
+      visited.delete(norm);
+      queue.unshift({ ...item, _retried: true });
+      await sleep(1200);
+    } else if (/BOTBLOCK|kein PDF/.test(msg)) {
       blocks++;
       if (blocks >= 10) {
         visited.delete(norm); queue.unshift(item, ...deferredPdf); saveState();
