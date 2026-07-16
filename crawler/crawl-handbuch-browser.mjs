@@ -439,7 +439,16 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
             window.__hbGuard = true;
             document.addEventListener('click', (e) => {
               const a = e.target.closest && e.target.closest('a');
-              if (a) e.preventDefault();
+              if (!a) return;
+              const href = a.getAttribute('href') || '';
+              // NUR echte Seiten-Navigation unterbinden. Reine Fragment-Links
+              // (href="#…") NICHT abfangen: manche Handbücher (UStH/UStAE)
+              // klappen ihre `div.toc.collapse` über hashchange/:target auf –
+              // ein preventDefault auf dem Fragment-Klick verhindert genau das
+              // und ließ 90 % des UStAE-Texts verborgen (Fund 2026-07-16:
+              // §15 sichtbar 10k von 313k Zeichen). AO expandiert per
+              // JS-Handler → dort ist beides gleich; verifiziert §13c + §8 = 1.00.
+              if (href && !href.startsWith('#')) e.preventDefault();
             }, true);
           }
           let n = 0;
@@ -490,6 +499,10 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
         url: norm, finalUrl, kind: 'content', from: item.from, fetchedAt: new Date().toISOString(),
         title: ex.title, h1: ex.h1, description: ex.description, date: ex.date,
         truncated: truncated || undefined, text: ex.text.slice(0, MAX_PAGE_CHARS),
+        // domLen = DOM-Textlänge (mit versteckten Knoten) → erlaubt einen
+        // beweisbaren Vollständigkeits-Audit nach dem Crawl (Regel „keine
+        // stillen Deckel"): sichtbar ≪ domLen ⇒ Akkordeon nicht aufgeklappt.
+        domLen: ex.tcLen,
       }) + '\n');
       nHtml++;
       sessionPages++;
