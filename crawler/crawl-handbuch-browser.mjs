@@ -415,6 +415,31 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
       const finalUrl = await gotoWithChallenge(norm);
       if (await challengedNow()) throw new Error(`BOTBLOCK: ${finalUrl}`);
       if (new URL(finalUrl).hostname !== HOST) throw new Error(`redirect off-host: ${finalUrl}`);
+      // Zugeklappte Akkordeons im INHALTSBEREICH aufklappen: die Handbücher
+      // verstecken die eigentlichen Verwaltungsvorschriften (AEAO/Richtlinien/
+      // Hinweise/KassenSichV) hinter „aufklappen"-Toggles (a.toc-toggle,
+      // aria-expanded=false) – innerText liest nur SICHTBARES, ohne diesen
+      // Schritt fehlte genau der Erlass-Text (Fund 2026-07-16: §146a-Seite
+      // 5k statt 94k Zeichen; Inhalt liegt komplett im DOM, kein Lazy-Load).
+      // Jeder Toggle wird höchstens EINMAL geklickt (data-Guard, sonst würde
+      // ein zweiter Klick wieder zuklappen); mehrere Runden nur für verschach-
+      // telte Akkordeons. Nav-/Menü-Toggles sind ausgenommen (closest nav/…).
+      for (let round = 0; round < 4; round++) {
+        const clicked = await page.evaluate(() => {
+          const root = document.querySelector('main') || document.querySelector('article')
+            || document.querySelector('#content') || document.body;
+          let n = 0;
+          for (const el of root.querySelectorAll('[aria-expanded="false"], details:not([open]) summary')) {
+            if (el.closest('nav, header, footer')) continue;
+            if (el.dataset.hbClicked) continue;
+            el.dataset.hbClicked = '1';
+            el.click(); n++;
+          }
+          return n;
+        }).catch(() => 0);
+        if (!clicked) break;
+        await page.waitForTimeout(350);
+      }
       // Extraktion IM Browser (robust gegen unbekanntes Markup): Titel, H1,
       // Description, Datum, Haupttext (main > article > #content > body), Links.
       const ex = await page.evaluate(() => {
@@ -433,8 +458,14 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
         const text = (root.innerText || '').replace(/[ \t ]+/g, ' ').replace(/ *\n+ */g, '\n').trim();
         const date = pickMeta('meta[name="dcterms.modified"]') || pickMeta('meta[name="dcterms.issued"]')
           || pickMeta('meta[name="date"]') || ((/\b(\d{1,2}\.\d{1,2}\.\d{4})\b/.exec(text.slice(0, 4000)) || [])[1] || '');
-        return { title: document.title || '', h1, description: pickMeta('meta[name="description"]'), date, text, links };
+        // tcLen = Textlänge INKLUSIVE versteckter Knoten – Wächter gegen
+        // weiterhin zugeklappte Inhalte (Regel „keine stillen Deckel")
+        const tcLen = (root.textContent || '').replace(/\s+/g, ' ').length;
+        return { title: document.title || '', h1, description: pickMeta('meta[name="description"]'), date, text, links, tcLen };
       });
+      if (ex.tcLen > 20000 && ex.text.length < ex.tcLen / 5) {
+        console.warn(`⚠️ Versteckter Inhalt vermutet (sichtbar ${ex.text.length} von ~${ex.tcLen} Zeichen): ${norm}`);
+      }
       const truncated = ex.text.length > MAX_PAGE_CHARS;
       if (truncated) console.warn(`⚠️ Seiten-Text-Deckel (${MAX_PAGE_CHARS}) greift: ${norm}`);
       pagesOut.write(JSON.stringify({
