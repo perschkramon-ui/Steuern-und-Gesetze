@@ -154,16 +154,28 @@ const browser = await chromium.launch({
   executablePath: args.chromium || process.env.BMF_CHROMIUM || undefined,
   proxy: proxyServer ? { server: proxyServer } : undefined,
 });
-const context = await browser.newContext({
-  ignoreHTTPSErrors: true,
-  locale: 'de-DE',
-  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-  viewport: { width: 1366, height: 900 },
-});
-await context.addInitScript(() => {
-  Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-});
-const page = await context.newPage();
+// Radware führt je Browser-Session ein NUTZUNGS-BUDGET (Empirie 2026-07-16:
+// drei unabhängige Sessions wurden alle nach ~70 Seiten / ~25 Min dauerhaft
+// geflaggt; eine bloße Neu-Navigation mit denselben Cookies bleibt dann
+// GEBLOCKT, während ein frischer Context die Challenge sofort wieder löst).
+// Deshalb: echter Session-Reset (neuer Context = neue Cookies) statt
+// Weiter-Navigieren – reaktiv nach einem BOTBLOCK UND proaktiv, BEVOR das
+// Budget zuschlägt (SESSION_BUDGET_* in der Crawl-Schleife).
+let context = null, page = null;
+async function newSession() {
+  if (context) await context.close().catch(() => {});
+  context = await browser.newContext({
+    ignoreHTTPSErrors: true,
+    locale: 'de-DE',
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    viewport: { width: 1366, height: 900 },
+  });
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+  });
+  page = await context.newPage();
+}
+await newSession();
 
 // Radware liefert die Challenge je nach Konfiguration auf DERSELBEN URL aus
 // (Titel „Radware Page…", danach Loader „Loading <ziel-url>", der selbst auf
@@ -336,6 +348,13 @@ let nHtml = 0, nPdf = 0, nErr = 0, blocks = 0;
 const deferredPdf = []; // über --maxpdf hinausgehende PDFs: zurückstellen statt
                         // den HTML-Crawl zu beenden; bleiben via State resümierbar
 
+// Proaktives Session-Recycling UNTER dem Radware-Budget (~70 Seiten/~25 Min,
+// s. newSession): Reset kostet nur die eine Challenge (~5–10 s) und verhindert
+// den 10×30-s-Fehler-Spiral komplett.
+const SESSION_BUDGET_PAGES = Number(args['session-pages'] || 45);
+const SESSION_BUDGET_MS = Number(args['session-min'] || 10) * 60 * 1000;
+let sessionPages = 0, sessionStart = Date.now();
+
 while (queue.length > 0 && nHtml < MAX_PAGES) {
   const item = queue.shift();
   const norm = normalize(item.url);
@@ -344,6 +363,13 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
   if (!kind) { visited.add(norm); continue; }
   if (kind === 'pdf' && nPdf >= MAX_PDF) { deferredPdf.push(item); continue; }
   visited.add(norm);
+
+  if (sessionPages >= SESSION_BUDGET_PAGES || Date.now() - sessionStart > SESSION_BUDGET_MS) {
+    console.log(`[${KUERZEL}] Session-Recycling nach ${sessionPages} Seiten (Radware-Budget)`);
+    sessionPages = 0; sessionStart = Date.now();
+    await newSession();
+    await gotoWithChallenge(`https://${HOST}${PREFIX || '/'}`).catch(() => {});
+  }
 
   try {
     if (kind === 'pdf') {
@@ -366,6 +392,7 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
       fs.writeFileSync(path.join(OUT, file), body);
       pdfOut.write(JSON.stringify({ url: norm, finalUrl: norm, file, bytes: body.length, from: item.from, linkText: item.linkText || '', fetchedAt: new Date().toISOString() }) + '\n');
       nPdf++;
+      sessionPages++;
       blocks = 0;
     } else {
       const finalUrl = await gotoWithChallenge(norm);
@@ -399,6 +426,7 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
         truncated: truncated || undefined, text: ex.text.slice(0, MAX_PAGE_CHARS),
       }) + '\n');
       nHtml++;
+      sessionPages++;
       blocks = 0;
       for (const l of ex.links) {
         const child = normalize(l.href, finalUrl);
@@ -419,9 +447,15 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
         process.exit(2);
       }
       await sleep(30000);
-      // Session/Cookies neu etablieren – ein „kein PDF" heißt meist, dass die
-      // Challenge-Cookies abgelaufen sind und der fetch die Bot-Seite bekam
+      // ECHTER Session-Reset statt Weiter-Navigieren: eine geflaggte Session
+      // bleibt mit ihren Cookies DAUERHAFT geblockt, erst ein frischer Context
+      // löst die Challenge wieder (Empirie 2026-07-16, s. newSession). Die
+      // geblockte URL wird sofort wieder eingereiht – die neue Session holt sie.
+      sessionPages = 0; sessionStart = Date.now();
+      await newSession();
       await gotoWithChallenge(`https://${HOST}${PREFIX || '/'}`).catch(() => {});
+      visited.delete(norm);
+      queue.unshift(item);
     }
   }
 
