@@ -166,14 +166,23 @@ await context.addInitScript(() => {
 const page = await context.newPage();
 
 // Radware liefert die Challenge je nach Konfiguration auf DERSELBEN URL aus
-// (Titel „Radware Page…", empirisch auf den Handbuch-Subdomains) ODER als
-// Redirect auf validate.perfdrive.com (empirisch auf der www-Hauptseite).
-// Beide Signaturen erkennen: URL, Titel UND Seiteninhalt (Review-Fund).
+// (Titel „Radware Page…", danach Loader „Loading <ziel-url>", der selbst auf
+// die Zielseite weiternavigiert – empirisch auf den Handbuch-Subdomains) ODER
+// als Redirect auf validate.perfdrive.com (empirisch auf der www-Hauptseite).
+// WICHTIG (Empirie lokaler Lauf 2026-07-16): Der ShieldSquare-Tag
+// (ssConf("cu","validate.perfdrive.com…")) steckt im <head> JEDER ECHTEN
+// Handbuch-Seite – ein reiner Inhalts-Match auf radware/perfdrive ist dort
+// also auf jeder Content-Seite ein False-Positive (der ao-Crawl brach damit
+// sofort mit „blockt bereits die Startseite" ab, obwohl die Challenge längst
+// gelöst war). Erkennung daher über URL + TITEL; der Inhalts-Match bleibt nur
+// als Ersatz für titel-lose Challenge-Shells und zählt NUR, wenn die Seite
+// praktisch leer ist (echte Handbuch-Seiten tragen hunderte Links).
 const challengedNow = async () => {
   if (/perfdrive|validate\./i.test(page.url())) return true;
   const t = await page.title().catch(() => '');
-  if (/radware|human verification|bot management/i.test(t)) return true;
+  if (/radware|human verification|bot management|^loading\b/i.test(t)) return true;
   return page.evaluate(() => {
+    if (document.querySelectorAll('a[href]').length > 3) return false;
     const h = document.documentElement ? document.documentElement.innerHTML : '';
     return /validate\.perfdrive|radware/i.test(h.slice(0, 20000));
   }).catch(() => false);
@@ -185,16 +194,15 @@ async function gotoWithChallenge(url) {
     // Redirect-Variante: auf die Rückleitung zum Host warten (wie crawl-bmf-browser)
     try { await page.waitForURL((u) => new URL(u).hostname === HOST, { timeout: 20000 }); } catch { /* bleibt geblockt */ }
   }
-  if (await challengedNow()) {
-    // Same-URL-Variante: Challenge-JS arbeiten lassen (lädt nach Cookie-Setzung selbst neu)
-    try {
-      await page.waitForFunction(
-        () => !/radware|human verification|bot management/i.test(document.title || ''),
-        null, { timeout: 25000 },
-      );
-    } catch { /* bleibt geblockt – vom Aufrufer als BOTBLOCK behandelt */ }
-    await page.waitForLoadState('domcontentloaded').catch(() => {});
+  // Same-URL-/Loader-Variante: Challenge-JS arbeiten lassen (setzt Cookie,
+  // der Loader navigiert danach SELBST auf die Zielseite weiter – empirisch
+  // ~4–8 s). Bis zur echten Seite pollen statt nur auf den Titel-Flip zu
+  // warten: zwischen Challenge und Zielseite liegt der Loader-Zustand, ein
+  // einzelner zu früher Check sieht sonst noch die alte Shell (Fund 2026-07-16).
+  for (const t0 = Date.now(); Date.now() - t0 < 45000 && await challengedNow();) {
+    await page.waitForTimeout(1000);
   }
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
   await page.waitForTimeout(400);
   return page.url();
 }

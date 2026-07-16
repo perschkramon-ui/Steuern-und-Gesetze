@@ -102,10 +102,17 @@ catch (e) { console.warn('EU-Refresh übersprungen:', e.message); }
 try { run('fetch-rii.mjs', '--out', '../rii-cache', '--refresh-toc', 'true', '--since', since); }
 catch (e) { console.warn('RII-Delta übersprungen:', e.message); }
 
-// 4. PDF-Texte (nur Neues – extract-pdf ist resumierbar)
-for (const cache of ['bmf-cache', 'bmjv-cache', 'bmjv-service-cache']) {
-  if (fs.existsSync(path.join(ROOT, cache, 'pdfmeta.jsonl'))) {
-    run('extract-pdf.mjs', '--cache', `../${cache}`, '--pdfjs', PDFJS);
+// 4. PDF-Texte (nur Neues – extract-pdf ist resumierbar). ALLE frischen
+//    Crawl-Caches mit pdfmeta.jsonl abdecken – die frühere Fest-Liste
+//    (bmf/bmjv/bmjv-service) hätte Handbuch- und BZSt-PDFs ohne Volltext ins
+//    Register laufen lassen („PDF – Text nicht extrahiert"; Fehlerklasse
+//    „stille Deckel", Fund lokale Session 2026-07-16). Restore-Caches sind
+//    ausgenommen: sie tragen pdftexts.jsonl bereits fertig, aber keine
+//    pdfs/-Dateien zum Extrahieren.
+for (const dir of fs.readdirSync(ROOT)) {
+  if (!/-cache$/.test(dir) || /-restored-cache$/.test(dir)) continue;
+  if (fs.existsSync(path.join(ROOT, dir, 'pdfmeta.jsonl'))) {
+    run('extract-pdf.mjs', '--cache', `../${dir}`, '--pdfjs', PDFJS);
   }
 }
 
