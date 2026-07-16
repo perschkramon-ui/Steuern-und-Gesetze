@@ -218,7 +218,17 @@ const challengedNow = async () => {
 };
 
 async function gotoWithChallenge(url) {
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  // page.goto selbst gegen transiente Timeouts absichern: bei paralleler Last
+  // (RII/BZSt + andere Chromium) timeoutete der EINE Start-Goto und riss – weil
+  // checkRobots ihn NICHT fängt – den ganzen Handbuch-Lauf mit Exit 1 ab
+  // (Fund 2026-07-16: 4 Handbücher starben so am Start). 3 Versuche mit
+  // wachsender Pause, bevor der Fehler nach oben durchschlägt.
+  let lastErr = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try { await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 }); lastErr = null; break; }
+    catch (e) { lastErr = e; await new Promise((r) => setTimeout(r, 2000 + attempt * 3000)); }
+  }
+  if (lastErr) throw lastErr;
   if (/perfdrive|validate\./i.test(page.url())) {
     // Redirect-Variante: auf die Rückleitung zum Host warten (wie crawl-bmf-browser)
     try { await page.waitForURL((u) => new URL(u).hostname === HOST, { timeout: 20000 }); } catch { /* bleibt geblockt */ }
@@ -531,14 +541,14 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
     nErr++;
     const msg = String(e && e.message || e);
     errOut.write(JSON.stringify({ url: norm, from: item.from, error: msg }) + '\n');
-    // NOROOT / navigation-destroyed context / transiente evaluate-Fehler:
-    // EINMAL sofort neu einreihen (kurze Pause), damit keine §§-Seite still
-    // verloren geht (Fund 2026-07-16). Kein Session-Reset nötig – die
-    // Challenge ist gelöst, nur der DOM war mid-navigation.
-    if (/NOROOT|Execution context was destroyed|reading 'querySelectorAll'/.test(msg) && !item._retried) {
+    // NOROOT / navigation-destroyed context / transiente evaluate-Fehler UND
+    // page.goto-/Netz-Timeouts (unter paralleler Last, Fund 2026-07-16:
+    // esth 98 goto-Fehler): EINMAL sofort neu einreihen (kurze Pause), damit
+    // keine §§-Seite still verloren geht. Kein Session-Reset – Challenge steht.
+    if (/NOROOT|Execution context was destroyed|reading 'querySelectorAll'|page\.goto|Timeout.*exceeded|net::|ERR_/.test(msg) && !item._retried) {
       visited.delete(norm);
       queue.unshift({ ...item, _retried: true });
-      await sleep(1200);
+      await sleep(1500);
     } else if (/BOTBLOCK|kein PDF/.test(msg)) {
       blocks++;
       if (blocks >= 10) {
