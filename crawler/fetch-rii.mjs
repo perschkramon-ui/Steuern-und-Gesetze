@@ -32,6 +32,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import readline from 'node:readline';
 import { stripTags } from './bmf-lib.mjs';
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, arr) =>
@@ -146,13 +147,17 @@ while ((m = itemRe.exec(toc))) {
 }
 console.log(`Index: ${items.length} Entscheidungen`);
 
-// Resume: bereits geladene doknr überspringen
+// Resume: bereits geladene doknr überspringen. STREAMEND einlesen (readline) –
+// die pages.jsonl wächst auf > 1 GB; ein `readFileSync().split()` sprengt V8s
+// String-Limit (~512 MB) und ließ den Resume abstürzen (Fund Stromausfall
+// 2026-07-17: 75.699 Urteile = 1,33 GB). Zeilenweise nur die doknr sammeln.
 const done = new Set();
 const outFile = path.join(OUT, 'pages.jsonl');
 if (fs.existsSync(outFile)) {
-  for (const line of fs.readFileSync(outFile, 'utf8').split(/\r?\n/)) {
+  const rl = readline.createInterface({ input: fs.createReadStream(outFile, 'utf8'), crlfDelay: Infinity });
+  for await (const line of rl) {
     if (!line.trim()) continue;
-    try { done.add(JSON.parse(line).doknr); } catch { /* ignore */ }
+    try { done.add(JSON.parse(line).doknr); } catch { /* unvollständige letzte Zeile o. Ä. */ }
   }
   console.log(`RESUME: ${done.size} bereits geladen`);
 }
