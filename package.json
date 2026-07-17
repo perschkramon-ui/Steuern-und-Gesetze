@@ -1,0 +1,9 @@
+{
+  "name": "steuern-und-gesetze",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Register aller Bundesgesetze, Verwaltungsvorschriften und Bundesrechtsprechung mit quellengebundener KI-Abfrage (zero-dep)",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": { "start": "node server/server.mjs" }
+}
