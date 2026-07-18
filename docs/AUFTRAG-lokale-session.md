@@ -5,10 +5,29 @@
 > Klon dieses Repos – NICHT im Kassensystem-Ordner. Alle Pfade sind relativ zum
 > Repo-Root; Regeln in CLAUDE.md hier.
 
-**Status: OFFEN** · Angelegt 2026-07-16, erweitert am selben Tag (Betreiber:
-„nimm alles auf und bastle das in die Anweisung für die lokale Session").
-**Diese Aufgabe gehört der LOKALEN Session** (Hausregel „Ein Fahrer pro
-Aufgabe"). Nach Erledigung: Status hier auf ERLEDIGT setzen + SESSION-LOG-Zeile.
+**Status: ERLEDIGT** (lokale Session 2026-07-17/18). Angelegt 2026-07-16,
+erweitert am selben Tag (Betreiber: „nimm alles auf und bastle das in die
+Anweisung für die lokale Session"). **Diese Aufgabe gehörte der LOKALEN
+Session** (Hausregel „Ein Fahrer pro Aufgabe").
+
+**Bilanz (alle Quellen gecrawlt + ins Register gebaut, verifiziert):**
+- **7 BMF-Handbücher** (Volltext, Akkordeons aufgeklappt): AO 770 · EStH 907 ·
+  UStH/UStAE 171 · LStH 653 · KStH 136 · GewStH 77 · ErbStH 211 = **2.925
+  Seiten + 59 PDFs**, 0 unterkürzt, 0 fehlend (domLen-Audit).
+- **Rechtsprechung des Bundes (RII):** alle **83.497 Urteile** ab 2010.
+- **Bundes-VwV:** 818 Seiten + 916 PDFs · **BZSt:** ~1.626 Seiten + 969 PDFs
+  inkl. DSFinV-K-2.4-ZIP (9 PDFs, u. a. „Einführung + Anwendungserlass §146a AO"
+  2019) · **EU-Recht:** MwStSystRL + MwSt-DVO + VerbrauchStSystRL.
+- **Register-Zähler:** gesetzeIndex 6123 (+1) · seiten 8908 (+5377) · pdfs 7424
+  (+1939) · **korpusChunks 917.943 (+702.708)** · urteile 83.497 — nichts
+  gesunken (Erfolgskontrolle bestanden).
+- ⚠️ **Railway-Konsequenz:** 918k Chunks sprengen `scope=alles` auf 8 GB RAM
+  (lokaler Boot-OOM bei 6 GB verifiziert) → Live-Dienst braucht
+  `KI_CORPUS_SCOPE=steuern` (244k Chunks, bootet in 85 s). Der VOLLE Stand
+  bleibt im Repo + Offline-Bundle; nur die live-durchsuchbare Menge ist der
+  Steuer-Kern (BMF/Handbücher/BZSt/VwV/EU/BFH). Für Voll-Live: Railway-Plan
+  mit mehr RAM.
+
 Alle Kommandos unten sind **PowerShell** (der PC ist Windows – keine
 bash-Syntax verwenden).
 
