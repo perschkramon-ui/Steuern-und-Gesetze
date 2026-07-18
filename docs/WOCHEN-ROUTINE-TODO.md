@@ -2,14 +2,15 @@
 
 > **Status: ERLEDIGT (2026-07-18, cloud).** Neue Routine angelegt und auf dieses
 > Repo gerichtet:
-> - Trigger: `trig_014NqLCik2p2HGgFkzX8WeUm`
->   („Wochen-Routine: Register-Neubau (update-all.mjs) → Draft-PR")
+> - Trigger: `trig_01NTbZ6VJYqZn7wjQDgpxcmE`
+>   („Wochen-Routine: Register-Neubau (update-all.mjs) → Auto-Merge (Zähler-Gate)")
 > - Zeitplan: `30 3 * * 1` = **Montag 03:30 UTC**, wöchentlich (nächster Lauf
 >   2026-07-20). Jeder Lauf startet eine **frische** Cloud-Session in der
 >   Umgebung `env_01Lq86KA4DUq3nhDDThkgFEf`, führt `update-all.mjs` aus (mit
 >   `NODE_USE_ENV_PROXY=1` + `NODE_OPTIONS=6144`), prüft `meta.counts` gegen die
->   Referenz unten und legt bei Erfolg einen Draft-PR an. Push-Benachrichtigung
->   an den Betreiber ist aktiv.
+>   Referenz unten und **mergt bei bestandenem Gate den PR selbst** (Auto-Merge,
+>   Betreiber-Entscheid 2026-07-18). Fällt ein Zähler unter die Referenz →
+>   Draft-PR + Push statt Merge. Push-Benachrichtigung an den Betreiber ist aktiv.
 > - Verwalten (pausieren/löschen/Zeitplan ändern): über die claude.ai-Routinen-
 >   UI oder die `*_trigger`-Werkzeuge des Claude-Code-Remote-Connectors.
 >
@@ -20,7 +21,8 @@
 
 ## Was die Routine tun soll
 
-Wöchentlich das Register frisch bauen und die Änderungen als Draft-PR vorlegen:
+Wöchentlich das Register frisch bauen und die Änderungen per PR einspielen
+(Auto-Merge nach bestandenem Zähler-Gate, sonst Draft-PR + Push):
 
 1. Frische Cloud-Session im Repo `perschkramon-ui/Steuern-und-Gesetze`
    (`git clone` / auf `origin/main`).
@@ -39,8 +41,12 @@ Wöchentlich das Register frisch bauen und die Änderungen als Draft-PR vorlegen
    ```bash
    node -e "console.log(JSON.parse(require('fs').readFileSync('data/register.json','utf8')).meta.counts)"
    ```
-4. `data/`-Artefakte committen (Branch + Draft-PR mit den Änderungszahlen aus
-   `data/changelog.json`). Der Betreiber merged.
+4. `data/`-Artefakte committen (Branch + PR mit den Änderungszahlen aus
+   `data/changelog.json`) + eine `docs/SESSION-LOG.md`-Zeile.
+5. **Auto-Merge (Betreiber-Entscheid 2026-07-18):** Besteht das Zähler-Gate
+   (3.), mergt die Routine den PR selbst (Squash) → löst den Railway-Deploy
+   aus; danach kurz `…/api/health` prüfen. Fällt ein Zähler → NICHT mergen,
+   Draft-PR stehen lassen, Betreiber anpingen.
 
 ## Zeitplan
 
