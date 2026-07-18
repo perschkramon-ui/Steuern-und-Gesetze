@@ -1,9 +1,22 @@
 # TODO (nächste Cloud-Session): Wochen-Routine neu anlegen
 
-> **Status: OFFEN.** Diese Aufgabe kann NUR eine **Cloud-Session** erledigen –
-> eine lokale Session kann keinen geplanten Cloud-Agenten registrieren.
-> Die alte Routine (im Kassensystem-Repo, Trigger `trig_016ZSxgVQHK48zR28MJ3EBRL`)
-> wurde beim Repo-Umzug gelöscht; die neue muss auf **dieses** Repo zeigen.
+> **Status: ERLEDIGT (2026-07-18, cloud).** Neue Routine angelegt und auf dieses
+> Repo gerichtet:
+> - Trigger: `trig_014NqLCik2p2HGgFkzX8WeUm`
+>   („Wochen-Routine: Register-Neubau (update-all.mjs) → Draft-PR")
+> - Zeitplan: `30 3 * * 1` = **Montag 03:30 UTC**, wöchentlich (nächster Lauf
+>   2026-07-20). Jeder Lauf startet eine **frische** Cloud-Session in der
+>   Umgebung `env_01Lq86KA4DUq3nhDDThkgFEf`, führt `update-all.mjs` aus (mit
+>   `NODE_USE_ENV_PROXY=1` + `NODE_OPTIONS=6144`), prüft `meta.counts` gegen die
+>   Referenz unten und legt bei Erfolg einen Draft-PR an. Push-Benachrichtigung
+>   an den Betreiber ist aktiv.
+> - Verwalten (pausieren/löschen/Zeitplan ändern): über die claude.ai-Routinen-
+>   UI oder die `*_trigger`-Werkzeuge des Claude-Code-Remote-Connectors.
+>
+> Historie: Die alte Routine (im Kassensystem-Repo, Trigger
+> `trig_016ZSxgVQHK48zR28MJ3EBRL`) wurde beim Repo-Umzug gelöscht; die neue
+> zeigt auf **dieses** Repo. Der Abschnitt unten bleibt als Referenz für den
+> Routine-Lauf (und für einen manuellen Neu-Lauf) stehen.
 
 ## Was die Routine tun soll
 
