@@ -23,6 +23,11 @@ mitgebracht; Historie bleibt im Kassen-Repo einsehbar). Regeln:
 - `origin/main` ist die einzige Quelle der Wahrheit; Branch + PR pro
   Aufgabe; NIE mergen, solange die CI des exakten Head-Commits nicht grün
   ist; gemergt wird nur auf ausdrückliches „mergen" des Betreibers.
+  **Ausnahme (Betreiber-Entscheid 2026-07-18):** die **Wochen-Routine**
+  mergt ihren eigenen PR selbst, sobald das `meta.counts`-Gate besteht
+  (kein Zähler unter Referenz); fällt ein Zähler → Draft-PR stehen lassen
+  und den Betreiber anpingen (nicht mergen). Für alle übrigen Sessions
+  gilt die Merge-Regel unverändert.
 - Session-Ende: eine Zeile an `docs/SESSION-LOG.md` anhängen.
 
 ## Was hier liegt (Landkarte)
@@ -95,11 +100,13 @@ mitgebracht; Historie bleibt im Kassen-Repo einsehbar). Regeln:
   `KI_CORPUS_SCOPE=steuern`).
 - **MCP-Connector in der Claude-App:** URL `…/mcp/<KI_ACCESS_CODE>`
   (README „Als Connector in der Claude-App").
-- **Wochen-Routine** (Mo 03:30 UTC): frische Cloud-Session führt
-  `crawler/update-all.mjs` aus (GII-Neuabruf, BMJV-Delta, BMF-Refresh,
-  EU-/RII-Deltas, Restore, Build, Offline-Bundle) und stellt einen Draft-PR;
-  der Betreiber merged. Nach dem Repo-Umzug muss die Routine auf DIESES
-  Repo zeigen (Status s. docs/SESSION-LOG.md).
+- **Wochen-Routine** (Mo 03:30 UTC, Trigger `trig_01NTbZ6VJYqZn7wjQDgpxcmE`,
+  zeigt auf DIESES Repo): frische Cloud-Session führt `crawler/update-all.mjs`
+  aus (GII-Neuabruf, BMJV-Delta, BMF-Refresh, EU-/RII-Deltas, Restore, Build,
+  Offline-Bundle), öffnet einen PR und **mergt ihn selbst, sobald das
+  `meta.counts`-Gate besteht** (Auto-Merge, Betreiber-Entscheid 2026-07-18;
+  bei Zähler-Rückgang Draft-PR + Push statt Merge). Der Merge löst den
+  Railway-Deploy aus. Details/Referenzzähler: docs/WOCHEN-ROUTINE-TODO.md.
 - **Cloud-Grenzen:** Radware-Hosts (BMF-Handbücher) + Chromium-Navigation
   nur lokal; Node-fetch braucht in der Cloud `NODE_USE_ENV_PROXY=1`;
   Port-80-Ziele sind im Proxy dicht (http→https umschreiben).
