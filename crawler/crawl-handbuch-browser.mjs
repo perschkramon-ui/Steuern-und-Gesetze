@@ -85,6 +85,23 @@ if (fs.existsSync(errFile)) {
     console.log(`${retry.length} fehlgeschlagene URLs erneut eingereiht`);
   }
 }
+// Enqueue-Dedupe: bisher wurde jede URL so oft eingereiht, wie sie verlinkt
+// ist (Dedupe erst beim Pop) – bei den stark vernetzten Handbüchern wächst die
+// Queue damit auf Hunderttausende Duplikate (Empirie ao 2026-07-16: 139k
+// Einträge bei 219 besuchten Seiten) und macht state.json (synchroner
+// Voll-Write alle 20 Seiten) und RAM unbrauchbar groß. Jede URL kommt jetzt
+// höchstens EINMAL in die Queue; Bestands-Queues aus altem State werden beim
+// Laden dedupliziert. (normalize ist als function declaration gehoisted.)
+{
+  const seen = new Set();
+  queue = queue.filter((q) => {
+    const n = normalize(q.url);
+    if (!n || seen.has(n)) return false;
+    seen.add(n);
+    return true;
+  });
+}
+const enqueued = new Set(queue.map((q) => normalize(q.url)));
 const saveState = () => fs.writeFileSync(stateFile, JSON.stringify({ visited: [...visited], queue }));
 
 // SYNCHRONE Appends statt WriteStreams: die Abbruch-Pfade (process.exit bei
@@ -154,47 +171,77 @@ const browser = await chromium.launch({
   executablePath: args.chromium || process.env.BMF_CHROMIUM || undefined,
   proxy: proxyServer ? { server: proxyServer } : undefined,
 });
-const context = await browser.newContext({
-  ignoreHTTPSErrors: true,
-  locale: 'de-DE',
-  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-  viewport: { width: 1366, height: 900 },
-});
-await context.addInitScript(() => {
-  Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-});
-const page = await context.newPage();
+// Radware führt je Browser-Session ein NUTZUNGS-BUDGET (Empirie 2026-07-16:
+// drei unabhängige Sessions wurden alle nach ~70 Seiten / ~25 Min dauerhaft
+// geflaggt; eine bloße Neu-Navigation mit denselben Cookies bleibt dann
+// GEBLOCKT, während ein frischer Context die Challenge sofort wieder löst).
+// Deshalb: echter Session-Reset (neuer Context = neue Cookies) statt
+// Weiter-Navigieren – reaktiv nach einem BOTBLOCK UND proaktiv, BEVOR das
+// Budget zuschlägt (SESSION_BUDGET_* in der Crawl-Schleife).
+let context = null, page = null;
+async function newSession() {
+  if (context) await context.close().catch(() => {});
+  context = await browser.newContext({
+    ignoreHTTPSErrors: true,
+    locale: 'de-DE',
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    viewport: { width: 1366, height: 900 },
+  });
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+  });
+  page = await context.newPage();
+}
+await newSession();
 
 // Radware liefert die Challenge je nach Konfiguration auf DERSELBEN URL aus
-// (Titel „Radware Page…", empirisch auf den Handbuch-Subdomains) ODER als
-// Redirect auf validate.perfdrive.com (empirisch auf der www-Hauptseite).
-// Beide Signaturen erkennen: URL, Titel UND Seiteninhalt (Review-Fund).
+// (Titel „Radware Page…", danach Loader „Loading <ziel-url>", der selbst auf
+// die Zielseite weiternavigiert – empirisch auf den Handbuch-Subdomains) ODER
+// als Redirect auf validate.perfdrive.com (empirisch auf der www-Hauptseite).
+// WICHTIG (Empirie lokaler Lauf 2026-07-16): Der ShieldSquare-Tag
+// (ssConf("cu","validate.perfdrive.com…")) steckt im <head> JEDER ECHTEN
+// Handbuch-Seite – ein reiner Inhalts-Match auf radware/perfdrive ist dort
+// also auf jeder Content-Seite ein False-Positive (der ao-Crawl brach damit
+// sofort mit „blockt bereits die Startseite" ab, obwohl die Challenge längst
+// gelöst war). Erkennung daher über URL + TITEL; der Inhalts-Match bleibt nur
+// als Ersatz für titel-lose Challenge-Shells und zählt NUR, wenn die Seite
+// praktisch leer ist (echte Handbuch-Seiten tragen hunderte Links).
 const challengedNow = async () => {
   if (/perfdrive|validate\./i.test(page.url())) return true;
   const t = await page.title().catch(() => '');
-  if (/radware|human verification|bot management/i.test(t)) return true;
+  if (/radware|human verification|bot management|^loading\b/i.test(t)) return true;
   return page.evaluate(() => {
+    if (document.querySelectorAll('a[href]').length > 3) return false;
     const h = document.documentElement ? document.documentElement.innerHTML : '';
     return /validate\.perfdrive|radware/i.test(h.slice(0, 20000));
   }).catch(() => false);
 };
 
 async function gotoWithChallenge(url) {
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  // page.goto selbst gegen transiente Timeouts absichern: bei paralleler Last
+  // (RII/BZSt + andere Chromium) timeoutete der EINE Start-Goto und riss – weil
+  // checkRobots ihn NICHT fängt – den ganzen Handbuch-Lauf mit Exit 1 ab
+  // (Fund 2026-07-16: 4 Handbücher starben so am Start). 3 Versuche mit
+  // wachsender Pause, bevor der Fehler nach oben durchschlägt.
+  let lastErr = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try { await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 }); lastErr = null; break; }
+    catch (e) { lastErr = e; await new Promise((r) => setTimeout(r, 2000 + attempt * 3000)); }
+  }
+  if (lastErr) throw lastErr;
   if (/perfdrive|validate\./i.test(page.url())) {
     // Redirect-Variante: auf die Rückleitung zum Host warten (wie crawl-bmf-browser)
     try { await page.waitForURL((u) => new URL(u).hostname === HOST, { timeout: 20000 }); } catch { /* bleibt geblockt */ }
   }
-  if (await challengedNow()) {
-    // Same-URL-Variante: Challenge-JS arbeiten lassen (lädt nach Cookie-Setzung selbst neu)
-    try {
-      await page.waitForFunction(
-        () => !/radware|human verification|bot management/i.test(document.title || ''),
-        null, { timeout: 25000 },
-      );
-    } catch { /* bleibt geblockt – vom Aufrufer als BOTBLOCK behandelt */ }
-    await page.waitForLoadState('domcontentloaded').catch(() => {});
+  // Same-URL-/Loader-Variante: Challenge-JS arbeiten lassen (setzt Cookie,
+  // der Loader navigiert danach SELBST auf die Zielseite weiter – empirisch
+  // ~4–8 s). Bis zur echten Seite pollen statt nur auf den Titel-Flip zu
+  // warten: zwischen Challenge und Zielseite liegt der Loader-Zustand, ein
+  // einzelner zu früher Check sieht sonst noch die alte Shell (Fund 2026-07-16).
+  for (const t0 = Date.now(); Date.now() - t0 < 45000 && await challengedNow();) {
+    await page.waitForTimeout(1000);
   }
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
   await page.waitForTimeout(400);
   return page.url();
 }
@@ -328,6 +375,13 @@ let nHtml = 0, nPdf = 0, nErr = 0, blocks = 0;
 const deferredPdf = []; // über --maxpdf hinausgehende PDFs: zurückstellen statt
                         // den HTML-Crawl zu beenden; bleiben via State resümierbar
 
+// Proaktives Session-Recycling UNTER dem Radware-Budget (~70 Seiten/~25 Min,
+// s. newSession): Reset kostet nur die eine Challenge (~5–10 s) und verhindert
+// den 10×30-s-Fehler-Spiral komplett.
+const SESSION_BUDGET_PAGES = Number(args['session-pages'] || 45);
+const SESSION_BUDGET_MS = Number(args['session-min'] || 10) * 60 * 1000;
+let sessionPages = 0, sessionStart = Date.now();
+
 while (queue.length > 0 && nHtml < MAX_PAGES) {
   const item = queue.shift();
   const norm = normalize(item.url);
@@ -336,6 +390,13 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
   if (!kind) { visited.add(norm); continue; }
   if (kind === 'pdf' && nPdf >= MAX_PDF) { deferredPdf.push(item); continue; }
   visited.add(norm);
+
+  if (sessionPages >= SESSION_BUDGET_PAGES || Date.now() - sessionStart > SESSION_BUDGET_MS) {
+    console.log(`[${KUERZEL}] Session-Recycling nach ${sessionPages} Seiten (Radware-Budget)`);
+    sessionPages = 0; sessionStart = Date.now();
+    await newSession();
+    await gotoWithChallenge(`https://${HOST}${PREFIX || '/'}`).catch(() => {});
+  }
 
   try {
     if (kind === 'pdf') {
@@ -358,20 +419,81 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
       fs.writeFileSync(path.join(OUT, file), body);
       pdfOut.write(JSON.stringify({ url: norm, finalUrl: norm, file, bytes: body.length, from: item.from, linkText: item.linkText || '', fetchedAt: new Date().toISOString() }) + '\n');
       nPdf++;
+      sessionPages++;
       blocks = 0;
     } else {
       const finalUrl = await gotoWithChallenge(norm);
       if (await challengedNow()) throw new Error(`BOTBLOCK: ${finalUrl}`);
       if (new URL(finalUrl).hostname !== HOST) throw new Error(`redirect off-host: ${finalUrl}`);
+      // Zugeklappte Akkordeons im INHALTSBEREICH aufklappen: die Handbücher
+      // verstecken die eigentlichen Verwaltungsvorschriften (AEAO/Richtlinien/
+      // Hinweise/KassenSichV) hinter „aufklappen"-Toggles (a.toc-toggle,
+      // aria-expanded=false) – innerText liest nur SICHTBARES, ohne diesen
+      // Schritt fehlte genau der Erlass-Text (Fund 2026-07-16: §146a-Seite
+      // 5k statt 94k Zeichen; Inhalt liegt komplett im DOM, kein Lazy-Load).
+      // Jeder Toggle wird höchstens EINMAL geklickt (data-Guard, sonst würde
+      // ein zweiter Klick wieder zuklappen); mehrere Runden nur für verschach-
+      // telte Akkordeons. Nav-/Menü-Toggles sind ausgenommen (closest nav/…).
+      // Aufklappen + Extraktion in EINER In-Place-Retry-Schleife: ein
+      // null-DOM (Seite noch am Settlen bei großen UStAE-§§ wie 12/24/25a)
+      // führte sonst sofort zu NOROOT und – bei zweitem Fehlschlag – zum
+      // stillen Verlust der Seite (Fund 2026-07-16: 10 usth-§§ verloren).
+      // Bis zu 3 Versuche mit Settle-Wartezeit, BEVOR NOROOT geworfen wird.
+      let ex = null;
+      for (let attempt = 0; attempt < 3 && !ex; attempt++) {
+        if (attempt > 0) {
+          await page.waitForLoadState('domcontentloaded').catch(() => {});
+          await page.waitForTimeout(700 + attempt * 500);
+        }
+      for (let round = 0; round < 4; round++) {
+        const clicked = await page.evaluate(() => {
+          const root = document.querySelector('main') || document.querySelector('article')
+            || document.querySelector('#content') || document.body;
+          if (!root) return 0;
+          // Die Toggles sind <a>-Anker MIT href (Progressive Enhancement):
+          // el.click() folgt dem href und NAVIGIERT die Seite weg → die
+          // Extraktion lief danach gegen ein Dokument ohne <body> und warf
+          // „Cannot read properties of null" (Fund 2026-07-16: 26/50 §§-Seiten
+          // je Handbuch verloren). Capture-Guard: die Default-Anker-Navigation
+          // wird unterbunden, der JS-Handler des Akkordeons läuft weiter.
+          if (!window.__hbGuard) {
+            window.__hbGuard = true;
+            document.addEventListener('click', (e) => {
+              const a = e.target.closest && e.target.closest('a');
+              if (!a) return;
+              const href = a.getAttribute('href') || '';
+              // NUR echte Seiten-Navigation unterbinden. Reine Fragment-Links
+              // (href="#…") NICHT abfangen: manche Handbücher (UStH/UStAE)
+              // klappen ihre `div.toc.collapse` über hashchange/:target auf –
+              // ein preventDefault auf dem Fragment-Klick verhindert genau das
+              // und ließ 90 % des UStAE-Texts verborgen (Fund 2026-07-16:
+              // §15 sichtbar 10k von 313k Zeichen). AO expandiert per
+              // JS-Handler → dort ist beides gleich; verifiziert §13c + §8 = 1.00.
+              if (href && !href.startsWith('#')) e.preventDefault();
+            }, true);
+          }
+          let n = 0;
+          for (const el of root.querySelectorAll('[aria-expanded="false"], details:not([open]) summary')) {
+            if (el.closest('nav, header, footer')) continue;
+            if (el.dataset.hbClicked) continue;
+            el.dataset.hbClicked = '1';
+            el.click(); n++;
+          }
+          return n;
+        }).catch(() => 0);
+        if (!clicked) break;
+        await page.waitForTimeout(350);
+      }
       // Extraktion IM Browser (robust gegen unbekanntes Markup): Titel, H1,
       // Description, Datum, Haupttext (main > article > #content > body), Links.
-      const ex = await page.evaluate(() => {
+      ex = await page.evaluate(() => {
         const pickMeta = (sel) => (document.querySelector(sel) || {}).content || '';
         // ERST Links + H1 einsammeln (können in nav/header stehen – die werden gleich entfernt)
         const links = Array.from(document.querySelectorAll('a[href]')).map((a) => ({ href: a.href, txt: (a.innerText || '').trim().slice(0, 120) }));
         const h1 = ((document.querySelector('h1') || {}).innerText || '').trim();
         const root = document.querySelector('main') || document.querySelector('article')
           || document.querySelector('#content') || document.body;
+        if (!root) return null; // Dokument mid-navigation → Aufrufer requeued
         // Störer im LIVE-DOM entfernen und innerText vom GERENDERTEN Knoten
         // lesen: innerText eines detached Clones fällt per HTML-Spec auf
         // textContent zurück und verliert alle Layout-Zeilenumbrüche –
@@ -381,21 +503,37 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
         const text = (root.innerText || '').replace(/[ \t ]+/g, ' ').replace(/ *\n+ */g, '\n').trim();
         const date = pickMeta('meta[name="dcterms.modified"]') || pickMeta('meta[name="dcterms.issued"]')
           || pickMeta('meta[name="date"]') || ((/\b(\d{1,2}\.\d{1,2}\.\d{4})\b/.exec(text.slice(0, 4000)) || [])[1] || '');
-        return { title: document.title || '', h1, description: pickMeta('meta[name="description"]'), date, text, links };
-      });
+        // tcLen = Textlänge INKLUSIVE versteckter Knoten – Wächter gegen
+        // weiterhin zugeklappte Inhalte (Regel „keine stillen Deckel")
+        const tcLen = (root.textContent || '').replace(/\s+/g, ' ').length;
+        return { title: document.title || '', h1, description: pickMeta('meta[name="description"]'), date, text, links, tcLen };
+      }).catch(() => null);
+      } // Ende In-Place-Retry-Schleife
+      // Nach 3 Versuchen immer noch kein DOM → als retriable behandeln
+      // (requeuen, kurze Pause), NIE die Seite still verlieren.
+      if (!ex) throw new Error(`NOROOT: ${norm}`);
+      if (ex.tcLen > 20000 && ex.text.length < ex.tcLen / 5) {
+        console.warn(`⚠️ Versteckter Inhalt vermutet (sichtbar ${ex.text.length} von ~${ex.tcLen} Zeichen): ${norm}`);
+      }
       const truncated = ex.text.length > MAX_PAGE_CHARS;
       if (truncated) console.warn(`⚠️ Seiten-Text-Deckel (${MAX_PAGE_CHARS}) greift: ${norm}`);
       pagesOut.write(JSON.stringify({
         url: norm, finalUrl, kind: 'content', from: item.from, fetchedAt: new Date().toISOString(),
         title: ex.title, h1: ex.h1, description: ex.description, date: ex.date,
         truncated: truncated || undefined, text: ex.text.slice(0, MAX_PAGE_CHARS),
+        // domLen = DOM-Textlänge (mit versteckten Knoten) → erlaubt einen
+        // beweisbaren Vollständigkeits-Audit nach dem Crawl (Regel „keine
+        // stillen Deckel"): sichtbar ≪ domLen ⇒ Akkordeon nicht aufgeklappt.
+        domLen: ex.tcLen,
       }) + '\n');
       nHtml++;
+      sessionPages++;
       blocks = 0;
       for (const l of ex.links) {
         const child = normalize(l.href, finalUrl);
-        if (!child || visited.has(child)) continue;
+        if (!child || visited.has(child) || enqueued.has(child)) continue;
         if (!classify(child)) continue;
+        enqueued.add(child);
         queue.push({ url: child, from: norm, linkText: l.txt });
       }
     }
@@ -403,7 +541,15 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
     nErr++;
     const msg = String(e && e.message || e);
     errOut.write(JSON.stringify({ url: norm, from: item.from, error: msg }) + '\n');
-    if (/BOTBLOCK|kein PDF/.test(msg)) {
+    // NOROOT / navigation-destroyed context / transiente evaluate-Fehler UND
+    // page.goto-/Netz-Timeouts (unter paralleler Last, Fund 2026-07-16:
+    // esth 98 goto-Fehler): EINMAL sofort neu einreihen (kurze Pause), damit
+    // keine §§-Seite still verloren geht. Kein Session-Reset – Challenge steht.
+    if (/NOROOT|Execution context was destroyed|reading 'querySelectorAll'|page\.goto|Timeout.*exceeded|net::|ERR_/.test(msg) && !item._retried) {
+      visited.delete(norm);
+      queue.unshift({ ...item, _retried: true });
+      await sleep(1500);
+    } else if (/BOTBLOCK|kein PDF/.test(msg)) {
       blocks++;
       if (blocks >= 10) {
         visited.delete(norm); queue.unshift(item, ...deferredPdf); saveState();
@@ -411,9 +557,15 @@ while (queue.length > 0 && nHtml < MAX_PAGES) {
         process.exit(2);
       }
       await sleep(30000);
-      // Session/Cookies neu etablieren – ein „kein PDF" heißt meist, dass die
-      // Challenge-Cookies abgelaufen sind und der fetch die Bot-Seite bekam
+      // ECHTER Session-Reset statt Weiter-Navigieren: eine geflaggte Session
+      // bleibt mit ihren Cookies DAUERHAFT geblockt, erst ein frischer Context
+      // löst die Challenge wieder (Empirie 2026-07-16, s. newSession). Die
+      // geblockte URL wird sofort wieder eingereiht – die neue Session holt sie.
+      sessionPages = 0; sessionStart = Date.now();
+      await newSession();
       await gotoWithChallenge(`https://${HOST}${PREFIX || '/'}`).catch(() => {});
+      visited.delete(norm);
+      queue.unshift(item);
     }
   }
 

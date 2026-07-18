@@ -16,6 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { StringDecoder } from 'node:string_decoder';
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, arr) =>
   a.startsWith('--') ? [a.slice(2), arr[i + 1]] : null).filter(Boolean));
@@ -98,9 +99,38 @@ function topicOf(u) {
   return '';
 }
 
-const readJsonl = (f) => (f && fs.existsSync(f))
-  ? fs.readFileSync(f, 'utf8').split('\n').filter((l) => l.trim()).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean)
-  : [];
+// Gepuffertes, synchrones Zeilen-Lesen: die RII-pages.jsonl wächst auf > 1 GB
+// (75k Urteile = 1,33 GB); ein readFileSync(...,'utf8') sprengt V8s
+// String-Limit (~512 MB) und ließ den Register-Bau abstürzen (Fund
+// 2026-07-17). Chunkweise lesen, Zeilen an '\n' trennen, Teilzeile im
+// Puffer halten – so entsteht nie ein Riesen-String. Rückgabe bleibt ein
+// Array (Aufrufer unverändert). Für kleine Dateien praktisch gleich schnell.
+const readJsonl = (f) => {
+  if (!f || !fs.existsSync(f)) return [];
+  const out = [];
+  const fd = fs.openSync(f, 'r');
+  const decoder = new StringDecoder('utf8'); // puffert an Chunk-Grenzen
+                                             // zerrissene UTF-8-Sequenzen
+                                             // (Umlaute bleiben intakt)
+  try {
+    const CHUNK = 1 << 20; // 1 MiB
+    const buf = Buffer.allocUnsafe(CHUNK);
+    let rest = '';
+    let bytes;
+    while ((bytes = fs.readSync(fd, buf, 0, CHUNK, null)) > 0) {
+      rest += decoder.write(buf.subarray(0, bytes));
+      let nl;
+      while ((nl = rest.indexOf('\n')) >= 0) {
+        const line = rest.slice(0, nl);
+        rest = rest.slice(nl + 1);
+        if (line.trim()) { try { out.push(JSON.parse(line)); } catch { /* defekte Zeile überspringen */ } }
+      }
+    }
+    rest += decoder.end();
+    if (rest.trim()) { try { out.push(JSON.parse(rest)); } catch { /* unvollständige letzte Zeile */ } }
+  } finally { fs.closeSync(fd); }
+  return out;
+};
 
 const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
 const snippet = (s, n) => { const c = clean(s); return c.length > n ? `${c.slice(0, n - 1)}…` : c; };

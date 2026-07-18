@@ -1,0 +1,30 @@
+{
+  "ao": {
+    "ausgabe": "/ao/2025/",
+    "zuletztGecrawlt": "2026-07-16T19:52:48.256Z"
+  },
+  "esth": {
+    "ausgabe": "/esth/2025/",
+    "zuletztGecrawlt": "2026-07-16T20:18:07.678Z"
+  },
+  "lsth": {
+    "ausgabe": "/lsth/2026/",
+    "zuletztGecrawlt": "2026-07-16T22:08:18.771Z"
+  },
+  "ksth": {
+    "ausgabe": "/ksth/2022/",
+    "zuletztGecrawlt": "2026-07-16T22:43:06.540Z"
+  },
+  "gewsth": {
+    "ausgabe": "/gewsth/2024/",
+    "zuletztGecrawlt": "2026-07-16T23:01:34.577Z"
+  },
+  "usth": {
+    "ausgabe": "/usth/2024/",
+    "zuletztGecrawlt": "2026-07-16T20:18:52.638Z"
+  },
+  "erbsth": {
+    "ausgabe": "/erbsth/2020/",
+    "zuletztGecrawlt": "2026-07-16T23:50:43.417Z"
+  }
+}

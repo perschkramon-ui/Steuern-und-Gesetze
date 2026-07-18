@@ -58,6 +58,11 @@ Variablen am Steuerwissen-Service setzen, der Gemini-Key kann bleiben
 | bundesfinanzministerium.de | Themenbereich Steuern (rekursiv) + verlinkte BMF-Schreiben/PDFs | amtlich |
 | gesetze-im-internet.de | Vollindex ALLER Bundesgesetze (klickbar) + Volltexte der steuerrelevanten Gesetze (§-genau, aus den amtlichen XML-Gesamtausgaben) | amtlich |
 | bmjv.de | Gesamtauftritt: XML-Sitemap + Link-Verfolgung (Themen inkl. „node"-Übersichtsseiten, Gesetzgebungsverfahren, Publikationen, Presse) + verlinkte PDFs. robots.txt ohne KI-/TDM-Vorbehalt (geprüft 2026-07-14). Der Service-Bereich (`/DE/service/`) ist auf ausdrückliche Betreiber-Entscheidung enthalten (2026-07-14): Inhalte sind amtliche Werke (§ 5 UrhG), die robots-Regel `/DE/Service/` matcht das reale kleingeschriebene Pfadschema nicht und zielt erkennbar auf Suchindex-Hygiene; Crawl begrenzt (max. 400 Seiten). | amtlich |
+| **Amtliche BMF-Handbücher** (ao/esth/lsth/ksth/gewsth/usth/erbsth `.bundesfinanzministerium.de`) | **Konsolidierte Verwaltungsvorschriften im Volltext: AEAO, EStR/EStH, LStR/LStH, KStR/KStH, GewStR/GewStH, UStAE, ErbStR/ErbStH + amtliche Hinweise** (2.925 Seiten + 59 PDFs). Nur vom lokalen PC crawlbar (Radware-Challenge auf jedem Abruf); robots-frei geprüft (2026-07-17). Akkordeon-Inhalte werden aufgeklappt (sonst fehlt der Erlass-Text). | amtlich |
+| verwaltungsvorschriften-im-internet.de (Bundes-VwV) | 789 Verwaltungsvorschriften des Bundes (Volltext, `bsvwvbund_*.htm`) über 28 Ressort-Teillisten (818 Seiten + 916 PDFs). robots.txt = alles erlaubt, kein TDM-Vorbehalt (geprüft 2026-07-16, iso-8859-1). | amtlich |
+| bzst.de (Bundeszentralamt für Steuern) | Merkblätter, Downloads, DSFinV-K-Bereich (~1.626 Seiten + 969 PDFs). robots-frei, **`Crawl-delay: 30` Pflicht**. Enthält den DSFinV-K-2.4-ZIP als Import (Spezifikation + „Einführung/Anwendungserlass §146a AO" 2019 + BSI-TR + AEAO §146). | amtlich |
+| EUR-Lex / CELLAR (EU-Umsatzsteuerrecht) | MwStSystRL 2006/112/EG, MwSt-DVO 282/2011, VerbrauchStSystRL 2020/262 (konsolidiert, deutsch). Über CELLAR (`publications.europa.eu`, robots: alles erlaubt) statt EUR-Lex (WAF-dicht); Anzeige-Link = EUR-Lex. | amtlich |
+| rechtsprechung-im-internet.de (RII, alle Bundesgerichte) | **83.497 Entscheidungen ab 2010** (BGH/BFH/BVerwG/BPatG/BAG/BSG/BVerfG). Betreiber-Freigabe 2026-07-16 trotz robots-Vorbehalt (gemeinfreie amtliche Werke § 5 UrhG, bereitgestellte Bulk-Schnittstelle, moderate Rate; **nicht auf andere robots-gesperrte Quellen übertragbar**). Urteile = Lazy-Blob-Karten + Korpus-Chunks, keine register.js-Einträge. | amtlich |
 | smartsteuer.de/online/lexikon | **NICHT übernommen** – robots.txt erklärt einen maschinenlesbaren KI-/TDM-Nutzungsvorbehalt (§ 44b UrhG). Nur als externer Link in der WebApp. | Sekundärquelle |
 
 Jeder Eintrag trägt Quelle, Stand (soweit angegeben) und Abrufdatum.
@@ -99,10 +104,19 @@ KI-Abfrage) und läuft als **eigener Railway-Service** neben KassenFlow:
    (Seit dem Repo-Umzug 2026-07-16 gibt es hier kein Kassen-Pre-Deploy mehr.)
 3. Variables: `GEMINI_API_KEY` (oder `PROVIDER=claude` + `ANTHROPIC_API_KEY`),
    **`KI_ACCESS_CODE=<selbstgewählter Code>`** (schützt das KI-Kontingent;
-   Register/Suche bleiben offen – amtliche Daten), optional
-   `KI_CORPUS_SCOPE=alles` (Vollkorpus alle Bundesgesetze, ~3 GB RAM;
-   Default `alles`, `steuern` = Steuer-Kern ~2 GB) und
-   `NODE_OPTIONS=--max-old-space-size=3072`.
+   Register/Suche bleiben offen – amtliche Daten), `NODE_OPTIONS=--max-old-space-size=6144`
+   und **`KI_CORPUS_SCOPE`**.
+   ⚠️ **RAM-Realität seit dem Rechtsprechungs-Vollausbau (2026-07-17):** Der
+   Vollkorpus (`scope=alles`) hat **~918.000 Chunks** (83k Urteile + alle
+   Gesetzesnormen). Der BM25-Index-Bau braucht dafür **> 6 GB Heap** (lokaler
+   Boot-OOM bei 6144 verifiziert) und bootet auf dem **8-GB-Hobby-Plan NICHT**.
+   → Am Railway-Service **`KI_CORPUS_SCOPE=steuern`** setzen: das lässt die
+   Topics „Bundesrecht (§§)" und „Rechtsprechung des Bundes" (Nicht-BFH-Urteile)
+   weg, ergibt **~244.000 Chunks** (Steuer-Kern: BMF, alle Handbücher/AEAO/
+   UStAE, BZSt/DSFinV-K, VwV, EU-Recht, BFH-Rechtsprechung) und bootet in ~85 s.
+   Der VOLLE Stand bleibt im Repo + Offline-Bundle erhalten – nur die *live*
+   durchsuchbare Menge ist der Steuer-Kern. Für den Vollkorpus live: Railway-Plan
+   mit ≥ 16 GB RAM + `NODE_OPTIONS=--max-old-space-size=12288`, `scope=alles`.
 3b. `HOST` ist auf Railway automatisch `0.0.0.0` (erkennt
    `RAILWAY_PUBLIC_DOMAIN`); `PORT` setzt Railway selbst.
 4. Settings → Networking → **Generate Domain** → der Link (z. B.
