@@ -56,10 +56,30 @@ if (!providers[cfg.PROVIDER]) {
 // ---------- Korpus laden ----------
 // Seit dem Volltext-Vollausbau (alle Bundesgesetze) ist der Korpus in Shards
 // abgelegt: corpus.jsonl.gz, corpus-2.jsonl.gz, … (GitHub-100-MB-Grenze).
-// KI_CORPUS_SCOPE=steuern lädt nur den Steuer-Kern – ohne die Topics
-// „Bundesrecht (§§)" und „Rechtsprechung des Bundes" (BGH/BVerwG/BAG/BSG/
-// BVerfG/BPatG-Urteile; „BFH · Rechtsprechung" bleibt als Steuer-Kern drin)
-// – für RAM-begrenzte Instanzen; Default: alles.
+//
+// KI_CORPUS_SCOPE steuert, welche SCHWEREN Topics live indexiert werden
+// (RAM-Bremse für den 8-GB-Hobby-Plan). WICHTIG (Fix 2026-07-21): Die
+// GESETZESTEXTE („Bundesrecht (§§)" = BGB/SGB/… und „Steuergesetze (§§)" =
+// AO/UStG/EStG/…) sind die PRIMÄREN Rechtsquellen und dürfen NIE stumm
+// wegfallen – sonst findet das Register keinen Paragrafen mehr, obwohl es mit
+// „alle Bundesgesetze paragrafengenau" wirbt (das war der Fehler: der alte
+// steuern-Filter warf „Bundesrecht (§§)" mit weg → § 615 BGB, § 96 SGB III &
+// Co. unauffindbar; verstößt gegen Regel 4 „keine stillen Deckel"). Der einzige
+// RAM-Treiber, dessen Ausschluss sich lohnt, ist die ~551k-Chunk-schwere
+// Nicht-BFH-Rechtsprechung „Rechtsprechung des Bundes" (BGH/BVerwG/BAG/BSG/
+// BVerfG/BPatG; „BFH · Rechtsprechung" bleibt als Steuer-Kern immer drin).
+//
+//   alles       – Vollkorpus (~918k Chunks), braucht ≥16 GB RAM
+//   steuern     – Live-Standard: Gesetze + Steuer-Kern, OHNE Nicht-BFH-Urteile
+//                 (~367k Chunks) → alle §§ durchsuchbar, passt auf 8 GB
+//   steuern-min – härteste Notbremse: zusätzlich OHNE „Bundesrecht (§§)"
+//                 (~244k); NUR für sehr kleine Instanzen, verliert die
+//                 allgemeinen (nicht-steuerlichen) Gesetze
+const SCOPE_DROP_TOPICS = {
+  alles: [],
+  steuern: ['Rechtsprechung des Bundes'],
+  'steuern-min': ['Rechtsprechung des Bundes', 'Bundesrecht (§§)'],
+};
 const corpusFiles = fs.existsSync(path.join(ROOT, 'data'))
   ? fs.readdirSync(path.join(ROOT, 'data')).filter((f) => /^corpus(-\d+)?\.jsonl\.gz$/.test(f)).sort()
   : [];
@@ -68,8 +88,10 @@ if (!corpusFiles.length) {
   process.exit(1);
 }
 const CORPUS_SCOPE = (process.env.KI_CORPUS_SCOPE || cfg.KI_CORPUS_SCOPE || 'alles').toLowerCase();
-console.log(`Lade Korpus … (${corpusFiles.length} Shard(s), Scope: ${CORPUS_SCOPE})`);
+const dropTopics = new Set(SCOPE_DROP_TOPICS[CORPUS_SCOPE] || SCOPE_DROP_TOPICS.alles);
+console.log(`Lade Korpus … (${corpusFiles.length} Shard(s), Scope: ${CORPUS_SCOPE}${dropTopics.size ? `; ohne: ${[...dropTopics].join(', ')}` : ' (Vollkorpus)'})`);
 const chunks = [];
+const droppedByTopic = new Map(); // Regel 4: kein stiller Deckel – Ausschluss wird gezählt & geloggt
 for (const f of corpusFiles) {
   // Zeilenweise über den DEKOMPRIMIERTEN Buffer scannen statt
   // .toString().split('\n'): das Riesen-String+Zeilen-Array-Duo trieb die
@@ -81,16 +103,22 @@ for (const f of corpusFiles) {
     if (end === -1) end = buf.length;
     if (end > start) {
       const c = JSON.parse(buf.toString('utf8', start, end));
-      if (CORPUS_SCOPE !== 'steuern' || (c.topic !== 'Bundesrecht (§§)' && c.topic !== 'Rechtsprechung des Bundes')) {
+      if (!dropTopics.has(c.topic)) {
         // Text SOFORT in einen UTF-8-Buffer umziehen: sonst leben alle Texte
         // gleichzeitig als UTF-16-Strings im Heap.
         c._buf = Buffer.from(c.text || '', 'utf8');
         c.text = undefined;
         chunks.push(c);
+      } else {
+        droppedByTopic.set(c.topic, (droppedByTopic.get(c.topic) || 0) + 1);
       }
     }
     start = end + 1;
   }
+}
+if (droppedByTopic.size) {
+  const summary = [...droppedByTopic.entries()].map(([t, n]) => `${t}=${n}`).join(', ');
+  console.log(`⚠️  Scope „${CORPUS_SCOPE}" schließt ${[...droppedByTopic.values()].reduce((a, b) => a + b, 0)} Chunk(s) vom Live-Index aus (${summary}). Voller Stand bleibt in data/ + Offline-Bundle.`);
 }
 
 // ---------- BM25-Index ----------
@@ -168,9 +196,39 @@ function bm25(queryTokens) {
   return scores;
 }
 
+// Gesetzes-Boost: Nennt die Frage explizit einen Paragrafen („§ 147 AO",
+// „§ 615 BGB", „§ 96 SGB III"), gehört die exakte Paragrafen-Fundstelle nach
+// oben – sie ist die PRIMÄRE Rechtsquelle und darf nicht unter Kommentar-/
+// Rechtsprechungstreffern begraben werden (Fund 2026-07-21: § 147 AO rankte
+// auf Rang 8 hinter 5 Sekundärquellen). Greift NUR bei ausdrücklicher
+// §-Nennung; ohne §-Zitat bleibt das reine BM25-Ranking unverändert.
+const STATUTE_TOPICS = new Set(['Bundesrecht (§§)', 'Steuergesetze (§§)']);
+const ROMAN = { i: '1', ii: '2', iii: '3', iv: '4', v: '5', vi: '6', vii: '7', viii: '8', ix: '9', x: '10', xi: '11', xii: '12', xiii: '13' };
+const normLaw = (s) => fold(s).replace(/\b([ivx]+)\b/g, (m, r) => ROMAN[r] || m).replace(/[^a-z0-9]/g, '');
+function citedParagraphNumbers(question) {
+  const nums = new Set();
+  for (const m of question.matchAll(/§\s*(\d+[a-z]?)/gi)) nums.add(m[1].toLowerCase());
+  return nums;
+}
+// Paragrafen-Titel wie „BGB § 615 – …" / „SGB 3 § 96 – …" → { law, num }
+function parseStatuteTitle(title) {
+  const m = /^(.+?)\s+§\s*(\d+[a-z]?)/.exec(title || '');
+  return m ? { law: m[1], num: m[2].toLowerCase() } : null;
+}
+
 function retrieve(question, topK = 10) {
   const qTokens = [...new Set(tokenize(question).flatMap((t) => [t, ...(SYNONYMS[t] || [])]))];
   const scores = bm25(qTokens);
+  // Exakt zitierte Paragrafen nach oben ziehen (nur bei „§ N GESETZ"-Nennung).
+  const citedNums = citedParagraphNumbers(question);
+  if (citedNums.size) {
+    const qNorm = normLaw(question);
+    for (let i = 0; i < scores.length; i++) {
+      if (scores[i] <= 0 || !STATUTE_TOPICS.has(chunks[i].topic)) continue;
+      const p = parseStatuteTitle(chunks[i].title);
+      if (p && citedNums.has(p.num) && qNorm.includes(normLaw(p.law))) scores[i] *= 1.8;
+    }
+  }
   const order = [...scores.keys()].sort((a, b) => scores[b] - scores[a]);
   const picked = [];
   const perUrl = new Map();
