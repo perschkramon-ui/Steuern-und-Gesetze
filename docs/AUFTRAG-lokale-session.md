@@ -23,10 +23,10 @@ Session** (Hausregel „Ein Fahrer pro Aufgabe").
   gesunken (Erfolgskontrolle bestanden).
 - ⚠️ **Railway-Konsequenz:** 918k Chunks sprengen `scope=alles` auf 8 GB RAM
   (lokaler Boot-OOM bei 6 GB verifiziert) → Live-Dienst braucht
-  `KI_CORPUS_SCOPE=steuern` (244k Chunks, bootet in 85 s). Der VOLLE Stand
-  bleibt im Repo + Offline-Bundle; nur die live-durchsuchbare Menge ist der
-  Steuer-Kern (BMF/Handbücher/BZSt/VwV/EU/BFH). Für Voll-Live: Railway-Plan
-  mit mehr RAM.
+  `KI_CORPUS_SCOPE=steuern` (seit Fix 2026-07-21 ~367k Chunks – behält ALLE
+  Gesetzestexte, filtert nur die Nicht-BFH-Rechtsprechung; Peak-RSS ~5,5 GB,
+  Boot ~2–3 min). Der VOLLE Stand bleibt im Repo + Offline-Bundle; live fehlt
+  nur die Nicht-BFH-Rechtsprechung. Für Voll-Live: Railway-Plan mit mehr RAM.
 
 Alle Kommandos unten sind **PowerShell** (der PC ist Windows – keine
 bash-Syntax verwenden).

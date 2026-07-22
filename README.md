@@ -110,13 +110,22 @@ KI-Abfrage) und läuft als **eigener Railway-Service** neben KassenFlow:
    Vollkorpus (`scope=alles`) hat **~918.000 Chunks** (83k Urteile + alle
    Gesetzesnormen). Der BM25-Index-Bau braucht dafür **> 6 GB Heap** (lokaler
    Boot-OOM bei 6144 verifiziert) und bootet auf dem **8-GB-Hobby-Plan NICHT**.
-   → Am Railway-Service **`KI_CORPUS_SCOPE=steuern`** setzen: das lässt die
-   Topics „Bundesrecht (§§)" und „Rechtsprechung des Bundes" (Nicht-BFH-Urteile)
-   weg, ergibt **~244.000 Chunks** (Steuer-Kern: BMF, alle Handbücher/AEAO/
-   UStAE, BZSt/DSFinV-K, VwV, EU-Recht, BFH-Rechtsprechung) und bootet in ~85 s.
-   Der VOLLE Stand bleibt im Repo + Offline-Bundle erhalten – nur die *live*
-   durchsuchbare Menge ist der Steuer-Kern. Für den Vollkorpus live: Railway-Plan
-   mit ≥ 16 GB RAM + `NODE_OPTIONS=--max-old-space-size=12288`, `scope=alles`.
+   → Am Railway-Service **`KI_CORPUS_SCOPE=steuern`** setzen (Live-Standard):
+   das lässt NUR die Topic „Rechtsprechung des Bundes" (Nicht-BFH-Urteile,
+   ~551k Chunks) weg und **behält alle Gesetzestexte** – ergibt **~367.000
+   Chunks** (alle §§ von BGB/SGB/AO/UStG/EStG/… + BMF, alle Handbücher/AEAO/
+   UStAE, BZSt/DSFinV-K, VwV, EU-Recht, BFH-Rechtsprechung), Peak-RSS ~5,5 GB
+   (auf 8 GB verifiziert) und bootet in ~2–3 min.
+   ⚠️ **Fix 2026-07-21 – NIE wieder Gesetze stumm droppen:** Bis dahin filterte
+   `steuern` zusätzlich „Bundesrecht (§§)" (alle allgemeinen Gesetze) → das
+   Register fand § 615 BGB, § 96 SGB III & jeden nicht-steuerlichen Paragrafen
+   NICHT mehr, obwohl es mit „alle Bundesgesetze paragrafengenau" wirbt (stiller
+   Deckel, Regel 4). Der Live-Boot loggt jetzt laut, welche Topics/Chunks er
+   ausschließt. Härteste Notbremse für sehr kleine Instanzen:
+   **`KI_CORPUS_SCOPE=steuern-min`** (~244k, verliert die allgemeinen Gesetze –
+   nur wählen, wenn `steuern` nicht bootet). Der VOLLE Stand bleibt im Repo +
+   Offline-Bundle erhalten. Für den Vollkorpus live: Railway-Plan mit ≥ 16 GB
+   RAM + `NODE_OPTIONS=--max-old-space-size=12288`, `scope=alles`.
 3b. `HOST` ist auf Railway automatisch `0.0.0.0` (erkennt
    `RAILWAY_PUBLIC_DOMAIN`); `PORT` setzt Railway selbst.
 4. Settings → Networking → **Generate Domain** → der Link (z. B.

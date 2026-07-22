@@ -77,8 +77,10 @@ Wöchentlich das Register frisch bauen und die Änderungen per PR einspielen
 - Service: Projekt `distinguished-education`, Service **„Steuern und Gesetze"**,
   Domain `steuernundgesetze.up.railway.app`, Quelle = `Steuern-und-Gesetze@main`.
 - Gesetzt: `NODE_OPTIONS=--max-old-space-size=6144` **und
-  `KI_CORPUS_SCOPE=steuern`** (244k Chunks – der 8-GB-Hobby-Plan kann
-  `scope=alles`/918k NICHT booten; der volle Stand bleibt im Repo/Offline-Bundle).
+  `KI_CORPUS_SCOPE=steuern`** (seit Fix 2026-07-21 ~367k Chunks – behält ALLE
+  Gesetzestexte, filtert nur die Nicht-BFH-Rechtsprechung; Peak-RSS ~5,5 GB,
+  passt auf 8 GB. Der 8-GB-Hobby-Plan kann `scope=alles`/918k NICHT booten;
+  der volle Stand bleibt im Repo/Offline-Bundle).
 - Jeder Merge nach `main` löst automatisch einen Deploy aus → danach
   `/api/health` prüfen (Boot 2–4 Min).
 

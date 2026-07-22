@@ -36,8 +36,17 @@ mitgebracht; Historie bleibt im Kassen-Repo einsehbar). Regeln:
   (`/api/ask`, `KI_ACCESS_CODE`-Gate) + **MCP-Connector** (`/mcp/<code>`,
   stateless Streamable HTTP; Tools register_suchen/quelle_lesen/
   kommende_aenderungen). Invertierter BM25-Index (Postings-Int32Arrays,
-  Texte als UTF-8-Buffer); `KI_CORPUS_SCOPE=alles|steuern` (steuern filtert
-  „Bundesrecht (§§)" + „Rechtsprechung des Bundes" – RAM-Bremse).
+  Texte als UTF-8-Buffer); `KI_CORPUS_SCOPE=alles|steuern|steuern-min`
+  (RAM-Bremse). **Gesetzestexte fallen NIE stumm weg** (Fix 2026-07-21):
+  `steuern` = Live-Standard, filtert NUR „Rechtsprechung des Bundes"
+  (Nicht-BFH-Urteile, ~551k Chunks) → alle §§ bleiben durchsuchbar (~367k
+  Chunks, Peak-RSS ~5,5 GB, passt auf 8 GB); `steuern-min` filtert zusätzlich
+  „Bundesrecht (§§)" (härteste Notbremse, verliert die allgemeinen Gesetze).
+  Der frühere `steuern` warf „Bundesrecht (§§)" mit weg → § 615 BGB/§ 96 SGB III
+  & alle nicht-steuerlichen §§ unauffindbar (Verstoß gegen Regel 4). Zusätzlich
+  zieht `retrieve()` bei ausdrücklicher „§ N GESETZ"-Nennung die exakte
+  Paragrafen-Fundstelle nach oben (Boost ×1,8; primäre Rechtsquelle vor
+  Kommentar/Rechtsprechung).
   Provider `gemini|claude|mock` (`server/providers.mjs`; claude OHNE
   Sampling-Parameter – Opus 4.7+/Sonnet 5 lehnen temperature mit 400 ab).
 - `webapp/index.html` – Offline-Suche (file://-fähig); Lazy-Blob
