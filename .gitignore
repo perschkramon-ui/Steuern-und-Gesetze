@@ -2,3 +2,7 @@ server/.env.local*
 *-cache/
 node_modules/
 .tools/
+
+# FTS5-Volltextindex (ephemer, wird beim Boot aus den Korpus-Shards gebaut)
+data/register-fts.db
+data/register-fts.db.building

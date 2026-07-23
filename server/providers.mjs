@@ -29,13 +29,17 @@ async function post(url, headers, body, timeoutMs = 60000) {
 export const providers = {
   async gemini(cfg, prompt) {
     if (!cfg.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY fehlt in server/.env.local');
-    const model = cfg.GEMINI_MODEL || 'gemini-2.5-flash';
+    // Genauigkeits-Default: gemini-2.5-pro (stärkeres Reasoning als -flash) für
+    // eine Rechts-KI. Override per GEMINI_MODEL. maxOutputTokens großzügig, weil
+    // 2.5-pro adaptives „Thinking" mitlaufen lässt, das gegen das Limit zählt –
+    // bei knappem Budget käme sonst eine leere Antwort (finishReason MAX_TOKENS).
+    const model = cfg.GEMINI_MODEL || 'gemini-2.5-pro';
     const j = await post(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
       { 'x-goog-api-key': cfg.GEMINI_API_KEY },
       {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 1500 },
+        generationConfig: { temperature: 0.1, maxOutputTokens: 8192 },
       },
     );
     const parts = j.candidates?.[0]?.content?.parts || [];

@@ -35,20 +35,27 @@ mitgebracht; Historie bleibt im Kassen-Repo einsehbar). Regeln:
 - `server/server.mjs` – zero-dep Web-Dienst: WebApp + Register + KI-Abfrage
   (`/api/ask`, `KI_ACCESS_CODE`-Gate) + **MCP-Connector** (`/mcp/<code>`,
   stateless Streamable HTTP; Tools register_suchen/quelle_lesen/
-  kommende_aenderungen). Invertierter BM25-Index (Postings-Int32Arrays,
-  Texte als UTF-8-Buffer); `KI_CORPUS_SCOPE=alles|steuern|steuern-min`
-  (RAM-Bremse). **Gesetzestexte fallen NIE stumm weg** (Fix 2026-07-21):
-  `steuern` = Live-Standard, filtert NUR „Rechtsprechung des Bundes"
-  (Nicht-BFH-Urteile, ~551k Chunks) → alle §§ bleiben durchsuchbar (~367k
-  Chunks, Peak-RSS ~5,5 GB, passt auf 8 GB); `steuern-min` filtert zusätzlich
-  „Bundesrecht (§§)" (härteste Notbremse, verliert die allgemeinen Gesetze).
-  Der frühere `steuern` warf „Bundesrecht (§§)" mit weg → § 615 BGB/§ 96 SGB III
-  & alle nicht-steuerlichen §§ unauffindbar (Verstoß gegen Regel 4). Zusätzlich
-  zieht `retrieve()` bei ausdrücklicher „§ N GESETZ"-Nennung die exakte
-  Paragrafen-Fundstelle nach oben (Boost ×1,8; primäre Rechtsquelle vor
-  Kommentar/Rechtsprechung).
-  Provider `gemini|claude|mock` (`server/providers.mjs`; claude OHNE
+  kommende_aenderungen). **SUCHE = SQLite-FTS5 AUF PLATTE (Umbau 2026-07-23,
+  `node:sqlite`, zero-dep):** Der Index liegt nicht mehr im RAM (das OOMte bei
+  918k Chunks), sondern als DB-Datei `data/register-fts.db` (ephemer,
+  gitignored, beim Boot aus den Korpus-Shards gebaut – Fingerabdruck aus
+  Shard-Größen überspringt den Bau bei unverändertem Korpus). Messung: Bau ~2 min
+  / ~0,6 GB RAM, Suche ~0,05 GB / ~60 ms, Datei ~4 GB. **Damit ist der VOLLE
+  Korpus inkl. ALLER Rechtsprechung (BGH/BAG/BSG/BVerwG/BVerfG) live** – auf dem
+  8-GB-Plan, 0 €. **`KI_CORPUS_SCOPE` ist GEGENSTANDSLOS** (wird nur für einen
+  Deprecation-Hinweis gelesen; der ganze Korpus wird immer indexiert – die
+  frühere RAM-Bremse/Scope-Logik entfällt). `retrieve()`: FTS5-`bm25` (Titel 10×)
+  über 80 Kandidaten → JS-Nachsortierung mit **Primärquellen-Boost** (Gesetze
+  ×1,25; exakt zitierter „§ N GESETZ" zusätzlich ×1,8) + **Dedup je URL** (max 2);
+  A/B gegen den alten RAM-BM25 verprobt (2026-07-23): §-Antworten bleiben Rang 1,
+  Rechtsprechung kommt zusätzlich. `/api/ask`-Fail-closed jetzt Score-Schwelle 15
+  (FTS5-Skala; der eigentliche Off-Topic-Wächter ist der strikte Prompt). Disk:
+  Dienst braucht ~5 GB (Korpus 0,6 + Index 4).
+  Provider `gemini|claude|mock` (`server/providers.mjs`; Default `gemini-2.5-pro`
+  für Genauigkeit, `maxOutputTokens` 8192 wg. Thinking; claude OHNE
   Sampling-Parameter – Opus 4.7+/Sonnet 5 lehnen temperature mit 400 ab).
+  **`verifyAnswer` Paragrafen-Wächter** (2026-07-23): jede §-Nummer der Antwort
+  muss in den Quellen vorkommen, sonst `verified=false` + Warnhinweis.
 - `webapp/index.html` – Offline-Suche (file://-fähig); Lazy-Blob
   `data/normen-register.js` (gzip+base64, DecompressionStream) trägt die
   §-Karteikarten ALLER Gesetze + die Urteils-Karten (Chip „⚖️ Urteile").
