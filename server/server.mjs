@@ -250,14 +250,17 @@ function buildPrompt(question, picked) {
   const src = picked.map((p, i) =>
     `[${i + 1}] ${p.c.title}${p.c.topic ? ` [${p.c.topic}]` : ''}${p.c.stand ? ` (${p.c.stand})` : ''}${p.c.date ? ` (${p.c.date})` : ''} — ${p.c.url}\n${p.c.text}`
   ).join('\n---\n');
-  return `Du bist ein Rechercheassistent für deutsches Steuerrecht. Beantworte die FRAGE ausschließlich mit Informationen aus den nummerierten QUELLEN.
+  return `Du bist ein Rechercheassistent für deutsches Recht und Steuerrecht. Beantworte die FRAGE ausschließlich mit Informationen aus den nummerierten QUELLEN.
 
 Strikte Regeln:
-1. Nutze NUR die QUELLEN unten. Kein eigenes Wissen, keine Vermutungen, keine Rechtsberatung.
-2. Belege JEDE Aussage mit Quellenverweisen in eckigen Klammern, z. B. [1] oder [2][3].
-3. Beantworten die Quellen die Frage nicht oder nur teilweise, sage das ausdrücklich: "Dazu enthält das Register keine ausreichende Quelle." Rate NIEMALS.
-4. Erfinde keine URLs, Paragraphen oder Daten. Zitiere §§ nur, wenn sie wörtlich in den Quellen stehen.
-5. Antworte auf Deutsch, präzise und knapp.
+1. Nutze AUSSCHLIESSLICH die QUELLEN unten. Kein eigenes Wissen, keine Vermutungen, keine Rechts- oder Steuerberatung.
+2. Belege JEDE Aussage mit Quellenverweisen in eckigen Klammern ([1], [2][3]). Nenne dabei die konkrete Norm (z. B. „§ 15a InsO") und – sofern die Quelle das angibt – den Stand („zuletzt geändert …" bzw. Ausfertigung).
+3. Zitiere den entscheidenden Wortlaut WÖRTLICH in Anführungszeichen aus der Quelle; paraphrasiere nur ergänzend. Erfinde niemals einen Gesetzeswortlaut.
+4. Erfinde keine URLs, Paragraphen, Fristen, Beträge oder Daten. Nenne eine §-Nummer nur, wenn sie GENAU SO in den QUELLEN steht.
+5. Beantworten die Quellen die Frage nicht oder nur teilweise, sage das ausdrücklich UND benenne, was fehlt: "Dazu enthält das Register keine ausreichende Quelle." Rate NIEMALS.
+6. Ist eine Quelle laut Stand möglicherweise veraltet, aufgehoben oder durch eine neuere Fassung ersetzt, weise ausdrücklich darauf hin.
+7. Widersprechen sich die Quellen, benenne den Widerspruch, statt eine Seite auszuwählen.
+8. Antworte auf Deutsch, präzise und sachlich – ohne Ausschmückung.
 
 FRAGE: ${question}
 
@@ -268,12 +271,27 @@ ${src}`;
 function verifyAnswer(answer, picked) {
   const allowed = new Set(picked.map((p) => p.c.url));
   let verified = true;
-  const cleaned = answer.replace(/https?:\/\/[^\s)\]>"']+/g, (u) => {
+  let cleaned = answer.replace(/https?:\/\/[^\s)\]>"']+/g, (u) => {
     const trimmed = u.replace(/[.,;:]+$/, '');
     if (allowed.has(trimmed)) return u;
     verified = false;
     return '[Link entfernt – nicht im Register]';
   });
+  // Paragraphen-Rückbindung (Genauigkeits-Wächter): JEDE §-Nummer in der Antwort
+  // muss in den gelieferten Quellen (Titel/Text) vorkommen. Fängt den
+  // gefährlichsten Rechtsfehler ab – eine erfundene/falsche §-Nummer, die das
+  // Modell trotz Quellenbindung nennt. Konservativ (nur §-Nummer, ohne
+  // Gesetzeszuordnung): lieber einmal zu viel markieren als eine Halluzination
+  // still durchlassen. Kein Entfernen (würde den Satz zerstören) – Warnhinweis +
+  // verified=false, die verlinkten Quellen bleiben zur Nachprüfung.
+  const paraTokens = (s) => (String(s).replace(/§+\s*/g, '§').toLowerCase().match(/§\d+[a-z]?/g) || []);
+  const inSources = new Set(picked.flatMap((p) => paraTokens(`${p.c.title} ${p.c.text}`)));
+  const unbacked = [...new Set(paraTokens(cleaned))].filter((t) => !inSources.has(t));
+  if (unbacked.length) {
+    verified = false;
+    const list = unbacked.map((t) => t.replace('§', '§ ')).join(', ');
+    cleaned += `\n\n⚠️ Hinweis: Diese Paragraphen-Angaben ließen sich in den Registerquellen nicht direkt bestätigen: ${list}. Bitte anhand der verlinkten Quellen prüfen.`;
+  }
   return { cleaned, verified };
 }
 
