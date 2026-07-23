@@ -192,8 +192,15 @@ function parseStatuteTitle(title) {
 function retrieve(question, topK = 10) {
   const base = [...new Set(fold(question).match(/[a-z0-9]+/g) || [])].filter((t) => t.length > 1);
   if (!base.length) return [];
-  const terms = [...new Set(base.flatMap((t) => [t, ...(SYNONYMS[t] || [])]))];
-  const rows = stmtRank.all(terms.join(' OR '));
+  // Frageterme + Synonyme. Synonyme können Sonderzeichen enthalten (z. B.
+  // „kassen-nachschau") → in reine [a-z0-9]-Tokens ZERLEGEN, sonst bricht der
+  // Bindestrich die FTS5-Query-Syntax. Jeden Term als String-LITERAL quoten:
+  // schützt zusätzlich vor FTS5-Schlüsselwörtern (OR/AND/NOT/NEAR), die als
+  // blanke Tokens sonst als Operatoren interpretiert würden.
+  const terms = [...new Set(base.flatMap((t) => [t, ...(SYNONYMS[t] || [])])
+    .flatMap((t) => t.match(/[a-z0-9]+/g) || []))].filter((t) => t.length > 1);
+  if (!terms.length) return [];
+  const rows = stmtRank.all(terms.map((t) => `"${t}"`).join(' OR '));
   // Primärquellen-Boost: Gesetzestexte sind die maßgebliche Rechtsquelle.
   // (a) genereller milder Boost (×1,25) – Gesetz vor Kommentar/Urteil bei
   // vergleichbarer Relevanz; (b) nennt die Frage „§ N GESETZ", die exakt
