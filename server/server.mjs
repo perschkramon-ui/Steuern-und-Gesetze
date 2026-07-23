@@ -29,6 +29,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { providers } from './providers.mjs';
 
@@ -53,78 +54,94 @@ if (!providers[cfg.PROVIDER]) {
   process.exit(1);
 }
 
-// ---------- Korpus laden ----------
-// Seit dem Volltext-Vollausbau (alle Bundesgesetze) ist der Korpus in Shards
-// abgelegt: corpus.jsonl.gz, corpus-2.jsonl.gz, … (GitHub-100-MB-Grenze).
-//
-// KI_CORPUS_SCOPE steuert, welche SCHWEREN Topics live indexiert werden
-// (RAM-Bremse für den 8-GB-Hobby-Plan). WICHTIG (Fix 2026-07-21): Die
-// GESETZESTEXTE („Bundesrecht (§§)" = BGB/SGB/… und „Steuergesetze (§§)" =
-// AO/UStG/EStG/…) sind die PRIMÄREN Rechtsquellen und dürfen NIE stumm
-// wegfallen – sonst findet das Register keinen Paragrafen mehr, obwohl es mit
-// „alle Bundesgesetze paragrafengenau" wirbt (das war der Fehler: der alte
-// steuern-Filter warf „Bundesrecht (§§)" mit weg → § 615 BGB, § 96 SGB III &
-// Co. unauffindbar; verstößt gegen Regel 4 „keine stillen Deckel"). Der einzige
-// RAM-Treiber, dessen Ausschluss sich lohnt, ist die ~551k-Chunk-schwere
-// Nicht-BFH-Rechtsprechung „Rechtsprechung des Bundes" (BGH/BVerwG/BAG/BSG/
-// BVerfG/BPatG; „BFH · Rechtsprechung" bleibt als Steuer-Kern immer drin).
-//
-//   alles       – Vollkorpus (~918k Chunks), braucht ≥16 GB RAM
-//   steuern     – Live-Standard: Gesetze + Steuer-Kern, OHNE Nicht-BFH-Urteile
-//                 (~367k Chunks) → alle §§ durchsuchbar, passt auf 8 GB
-//   steuern-min – härteste Notbremse: zusätzlich OHNE „Bundesrecht (§§)"
-//                 (~244k); NUR für sehr kleine Instanzen, verliert die
-//                 allgemeinen (nicht-steuerlichen) Gesetze
-const SCOPE_DROP_TOPICS = {
-  alles: [],
-  steuern: ['Rechtsprechung des Bundes'],
-  'steuern-min': ['Rechtsprechung des Bundes', 'Bundesrecht (§§)'],
-};
-const corpusFiles = fs.existsSync(path.join(ROOT, 'data'))
-  ? fs.readdirSync(path.join(ROOT, 'data')).filter((f) => /^corpus(-\d+)?\.jsonl\.gz$/.test(f)).sort()
+// ---------- Korpus → FTS5-Volltextindex AUF PLATTE ----------
+// Umbau 2026-07-23: Der Suchindex liegt nicht mehr komplett im RAM (das OOMte
+// bei 918k Chunks auf dem 8-GB-Plan → daher die frühere RAM-Bremse
+// KI_CORPUS_SCOPE, die die Nicht-BFH-Rechtsprechung LIVE ausblendete), sondern
+// als SQLite-FTS5-Datenbank AUF DER PLATTE (node:sqlite, zero-dep, FTS5
+// eingebaut). Messung: Bau 918k Dok ~3 min bei ~0,6 GB RAM; Suche ~0,05 GB /
+// ~60 ms; DB-Datei ~4 GB. Dadurch ist der VOLLE Korpus inkl. ALLER
+// Rechtsprechung (BGH/BAG/BSG/BVerwG/BVerfG) live durchsuchbar – gleicher
+// 8-GB-Plan, weiterhin 0 €. KI_CORPUS_SCOPE ist damit GEGENSTANDSLOS.
+const DATA_DIR = path.join(ROOT, 'data');
+const corpusFiles = fs.existsSync(DATA_DIR)
+  ? fs.readdirSync(DATA_DIR).filter((f) => /^corpus(-\d+)?\.jsonl\.gz$/.test(f)).sort()
   : [];
 if (!corpusFiles.length) {
-  console.error(`Korpus fehlt in ${path.join(ROOT, 'data')}\nErst das Register bauen (siehe README, build-register.mjs).`);
+  console.error(`Korpus fehlt in ${DATA_DIR}\nErst das Register bauen (siehe README, build-register.mjs).`);
   process.exit(1);
 }
-const CORPUS_SCOPE = (process.env.KI_CORPUS_SCOPE || cfg.KI_CORPUS_SCOPE || 'alles').toLowerCase();
-const dropTopics = new Set(SCOPE_DROP_TOPICS[CORPUS_SCOPE] || SCOPE_DROP_TOPICS.alles);
-console.log(`Lade Korpus … (${corpusFiles.length} Shard(s), Scope: ${CORPUS_SCOPE}${dropTopics.size ? `; ohne: ${[...dropTopics].join(', ')}` : ' (Vollkorpus)'})`);
-const chunks = [];
-const droppedByTopic = new Map(); // Regel 4: kein stiller Deckel – Ausschluss wird gezählt & geloggt
-for (const f of corpusFiles) {
-  // Zeilenweise über den DEKOMPRIMIERTEN Buffer scannen statt
-  // .toString().split('\n'): das Riesen-String+Zeilen-Array-Duo trieb die
-  // RSS-Spitze um ~0,5 GB je Shard hoch (OOM-Risiko im POS-Prozess).
-  const buf = zlib.gunzipSync(fs.readFileSync(path.join(ROOT, 'data', f)));
-  let start = 0;
-  while (start < buf.length) {
-    let end = buf.indexOf(10, start);
-    if (end === -1) end = buf.length;
-    if (end > start) {
-      const c = JSON.parse(buf.toString('utf8', start, end));
-      if (!dropTopics.has(c.topic)) {
-        // Text SOFORT in einen UTF-8-Buffer umziehen: sonst leben alle Texte
-        // gleichzeitig als UTF-16-Strings im Heap.
-        c._buf = Buffer.from(c.text || '', 'utf8');
-        c.text = undefined;
-        chunks.push(c);
-      } else {
-        droppedByTopic.set(c.topic, (droppedByTopic.get(c.topic) || 0) + 1);
-      }
-    }
-    start = end + 1;
+{
+  const legacyScope = (process.env.KI_CORPUS_SCOPE || cfg.KI_CORPUS_SCOPE || '').toLowerCase();
+  if (legacyScope && legacyScope !== 'alles') {
+    console.log('ℹ️  KI_CORPUS_SCOPE ist mit dem FTS5-Index gegenstandslos – es wird IMMER der volle Korpus (inkl. Rechtsprechung) indexiert. Die Variable kann am Railway-Dienst entfernt werden.');
   }
 }
-if (droppedByTopic.size) {
-  const summary = [...droppedByTopic.entries()].map(([t, n]) => `${t}=${n}`).join(', ');
-  console.log(`⚠️  Scope „${CORPUS_SCOPE}" schließt ${[...droppedByTopic.values()].reduce((a, b) => a + b, 0)} Chunk(s) vom Live-Index aus (${summary}). Voller Stand bleibt in data/ + Offline-Bundle.`);
+// Ephemere DB-Datei (nicht ins Git – s. .gitignore). Wird beim Deploy aus den
+// committeten Korpus-Shards neu gebaut; ein Railway-Volume ist NICHT nötig.
+const DB_PATH = process.env.KI_FTS_DB || path.join(DATA_DIR, 'register-fts.db');
+// Billiger Vollständigkeits-Fingerabdruck der Shards (Name+Größe) – ändert er
+// sich, wird der Index neu gebaut; kein Dekomprimieren beim Boot nötig.
+const corpusFingerprint = () => JSON.stringify(corpusFiles.map((f) => [f, fs.statSync(path.join(DATA_DIR, f)).size]));
+
+function buildFtsIndex(dbPath) {
+  const tmp = `${dbPath}.building`;
+  try { fs.rmSync(tmp, { force: true }); } catch { /* egal */ }
+  const bdb = new DatabaseSync(tmp);
+  bdb.exec('PRAGMA journal_mode=OFF; PRAGMA synchronous=OFF;');
+  bdb.exec("CREATE VIRTUAL TABLE docs USING fts5(title, body, url UNINDEXED, topic UNINDEXED, stand UNINDEXED, tokenize='unicode61')");
+  const ins = bdb.prepare('INSERT INTO docs(title,body,url,topic,stand) VALUES(?,?,?,?,?)');
+  let n = 0;
+  bdb.exec('BEGIN');
+  for (const f of corpusFiles) {
+    const buf = zlib.gunzipSync(fs.readFileSync(path.join(DATA_DIR, f)));
+    let s = 0;
+    while (s < buf.length) {
+      let e = buf.indexOf(10, s);
+      if (e === -1) e = buf.length;
+      if (e > s) {
+        let c; try { c = JSON.parse(buf.toString('utf8', s, e)); } catch { s = e + 1; continue; }
+        ins.run(c.title || '', c.text || '', c.url || '', c.topic || '', c.stand || c.date || '');
+        if (++n % 50000 === 0) { bdb.exec('COMMIT'); bdb.exec('BEGIN'); }
+      }
+      s = e + 1;
+    }
+  }
+  bdb.exec('COMMIT');
+  bdb.exec('CREATE TABLE meta(k TEXT PRIMARY KEY, v)');
+  const setMeta = bdb.prepare('INSERT INTO meta(k,v) VALUES(?,?)');
+  setMeta.run('docs', n);
+  setMeta.run('fingerprint', corpusFingerprint());
+  bdb.close();
+  fs.renameSync(tmp, dbPath); // atomar: die fertige DB erscheint erst komplett
+  return n;
 }
 
-// ---------- BM25-Index ----------
+// Vorhandenen Index öffnen ODER (falls fehlend/veraltet/defekt) neu bauen.
+const fp = corpusFingerprint();
+let needBuild = true;
+if (fs.existsSync(DB_PATH)) {
+  try {
+    const probe = new DatabaseSync(DB_PATH, { readOnly: true });
+    const got = probe.prepare('SELECT v FROM meta WHERE k=?').get('fingerprint');
+    probe.close();
+    if (got && got.v === fp) needBuild = false;
+    else console.log('FTS5-Index veraltet (Korpus geändert) → Neuaufbau.');
+  } catch { console.log('FTS5-Index defekt/altes Format → Neuaufbau.'); }
+}
+if (needBuild) {
+  console.log('Baue FTS5-Volltextindex auf Platte … (einmalig ~3 min, ~0,6 GB RAM)');
+  const t0 = Date.now();
+  const n = buildFtsIndex(DB_PATH);
+  console.log(`FTS5-Index gebaut: ${n} Dokumente in ${((Date.now() - t0) / 1000).toFixed(0)}s.`);
+}
+const fdb = new DatabaseSync(DB_PATH, { readOnly: true });
+const DOC_COUNT = Number(fdb.prepare('SELECT v FROM meta WHERE k=?').get('docs').v);
+console.log(`FTS5-Index bereit: ${DOC_COUNT} Dokumente durchsuchbar (Datei ${(fs.statSync(DB_PATH).size / 2 ** 30).toFixed(2)} GB).`);
+
+// ---------- Suche (FTS5 + App-Verfeinerungen) ----------
 const fold = (s) => (s || '').toLowerCase()
   .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss');
-const tokenize = (s) => fold(s).replace(/§\s*/g, '§').split(/[^a-z0-9§]+/).filter((t) => t.length > 1);
 
 const SYNONYMS = {
   aufbewahrung: ['aufbewahrungsfrist', 'aufbewahren', 'aufzubewahren'],
@@ -144,57 +161,13 @@ const SYNONYMS = {
   gutschein: ['gutscheine', 'einzweck', 'mehrzweck'],
 };
 
-console.log('Baue BM25-Index …');
-// INVERTIERTER Index statt tf-Map je Dokument: Beim Volltext-Vollausbau
-// (>200k Chunks) kosteten die per-Doc-Maps 3,4 GB RSS (Messung 2026-07-15)
-// – im POS-Prozess ein OOM-Risiko. Postings-Arrays je Token (Int32Array:
-// docIdx,tf-Paare) + Chunk-Text als UTF-8-Buffer (statt UTF-16-String,
-// materialisiert nur für Top-Treffer) senken das auf einen Bruchteil.
-// Nebeneffekt: bm25() läuft nur noch über die Postings der Suchwörter.
-const df = new Map();
-const postings = new Map();
-const docLen = new Uint32Array(chunks.length);
-const texts = new Array(chunks.length);
-{
-  const tf = new Map();
-  for (let i = 0; i < chunks.length; i++) {
-    const c = chunks[i];
-    // Text nur TRANSIENT als String (ein Dokument zur Zeit)
-    const toks = tokenize(`${c.title} ${c._buf.toString('utf8')}`);
-    docLen[i] = toks.length;
-    tf.clear();
-    for (const t of toks) tf.set(t, (tf.get(t) || 0) + 1);
-    for (const [t, f] of tf) {
-      df.set(t, (df.get(t) || 0) + 1);
-      let arr = postings.get(t);
-      if (!arr) { arr = []; postings.set(t, arr); }
-      arr.push(i, f);
-    }
-    texts[i] = c._buf;
-    delete c._buf;
-  }
-}
-for (const [t, arr] of postings) postings.set(t, Int32Array.from(arr));
-let lenSum = 0;
-for (let i = 0; i < docLen.length; i++) lenSum += docLen[i];
-const avgLen = lenSum / Math.max(1, chunks.length);
-const N = chunks.length;
-const K1 = 1.5, B = 0.75;
-
-function bm25(queryTokens) {
-  const scores = new Float64Array(chunks.length);
-  for (const q of queryTokens) {
-    const post = postings.get(q);
-    if (!post) continue;
-    const n = df.get(q);
-    const idf = Math.log(1 + (N - n + 0.5) / (n + 0.5));
-    for (let j = 0; j < post.length; j += 2) {
-      const i = post[j], f = post[j + 1];
-      scores[i] += idf * (f * (K1 + 1)) / (f + K1 * (1 - B + B * docLen[i] / avgLen));
-    }
-  }
-  return scores;
-}
+// FTS5-Ranking über die 80 besten Kandidaten (bm25, Titel 10× gewichtet =
+// spiegelt die frühere Titel-Betonung); Boost/Dedup danach in JS. FTS5 gibt
+// negative Scores (relevanter = negativer) → wir invertieren zu positivem rel.
+const stmtRank = fdb.prepare(
+  'SELECT rowid, title, topic, url, stand, -bm25(docs, 10.0, 1.0) AS rel FROM docs WHERE docs MATCH ? ORDER BY rel DESC LIMIT 80',
+);
+const stmtBody = fdb.prepare('SELECT body FROM docs WHERE rowid = ?');
 
 // Gesetzes-Boost: Nennt die Frage explizit einen Paragrafen („§ 147 AO",
 // „§ 615 BGB", „§ 96 SGB III"), gehört die exakte Paragrafen-Fundstelle nach
@@ -217,29 +190,34 @@ function parseStatuteTitle(title) {
 }
 
 function retrieve(question, topK = 10) {
-  const qTokens = [...new Set(tokenize(question).flatMap((t) => [t, ...(SYNONYMS[t] || [])]))];
-  const scores = bm25(qTokens);
-  // Exakt zitierte Paragrafen nach oben ziehen (nur bei „§ N GESETZ"-Nennung).
+  const base = [...new Set(fold(question).match(/[a-z0-9]+/g) || [])].filter((t) => t.length > 1);
+  if (!base.length) return [];
+  const terms = [...new Set(base.flatMap((t) => [t, ...(SYNONYMS[t] || [])]))];
+  const rows = stmtRank.all(terms.join(' OR '));
+  // Primärquellen-Boost: Gesetzestexte sind die maßgebliche Rechtsquelle.
+  // (a) genereller milder Boost (×1,25) – Gesetz vor Kommentar/Urteil bei
+  // vergleichbarer Relevanz; (b) nennt die Frage „§ N GESETZ", die exakt
+  // passende Paragrafenstelle zusätzlich ×1,8 ganz nach oben (Fund 2026-07-21,
+  // A/B-verprobt 2026-07-23: §-Antworten bleiben Rang 1, Urteile kommen dazu).
   const citedNums = citedParagraphNumbers(question);
-  if (citedNums.size) {
-    const qNorm = normLaw(question);
-    for (let i = 0; i < scores.length; i++) {
-      if (scores[i] <= 0 || !STATUTE_TOPICS.has(chunks[i].topic)) continue;
-      const p = parseStatuteTitle(chunks[i].title);
-      if (p && citedNums.has(p.num) && qNorm.includes(normLaw(p.law))) scores[i] *= 1.8;
+  const qNorm = citedNums.size ? normLaw(question) : '';
+  for (const r of rows) {
+    if (!STATUTE_TOPICS.has(r.topic)) continue;
+    r.rel *= 1.25;
+    if (citedNums.size) {
+      const p = parseStatuteTitle(r.title);
+      if (p && citedNums.has(p.num) && qNorm.includes(normLaw(p.law))) r.rel *= 1.8;
     }
   }
-  const order = [...scores.keys()].sort((a, b) => scores[b] - scores[a]);
+  rows.sort((a, b) => b.rel - a.rel);
   const picked = [];
   const perUrl = new Map();
-  for (const i of order) {
-    if (scores[i] <= 0) break;
-    const c = chunks[i];
-    const cnt = perUrl.get(c.url) || 0;
-    if (cnt >= 2) continue; // Quellen-Vielfalt statt 10 Chunks derselben Seite
-    perUrl.set(c.url, cnt + 1);
-    // Text erst hier materialisieren (nur für die Top-Treffer)
-    picked.push({ score: scores[i], c: Object.assign({}, c, { text: texts[i].toString('utf8') }) });
+  for (const r of rows) {
+    const cnt = perUrl.get(r.url) || 0;
+    if (cnt >= 2) continue; // Quellen-Vielfalt statt mehrfach dieselbe Seite
+    perUrl.set(r.url, cnt + 1);
+    const body = stmtBody.get(r.rowid); // Volltext erst für die Top-Treffer laden
+    picked.push({ score: r.rel, c: { title: r.title, topic: r.topic, url: r.url, stand: r.stand, text: body ? body.body : '' } });
     if (picked.length >= topK) break;
   }
   return picked;
@@ -366,10 +344,8 @@ function mcpToolCall(name, args) {
   if (name === 'quelle_lesen') {
     const wanted = String(args?.url || '').trim();
     if (!wanted) return { error: 'url fehlt' };
-    const parts = [];
-    for (let i = 0; i < chunks.length; i++) {
-      if (chunks[i].url === wanted) parts.push({ title: chunks[i].title, stand: chunks[i].stand || chunks[i].date || '', text: texts[i].toString('utf8') });
-    }
+    const parts = fdb.prepare('SELECT title, stand, body FROM docs WHERE url = ? ORDER BY rowid').all(wanted)
+      .map((r) => ({ title: r.title, stand: r.stand || '', text: r.body || '' }));
     if (!parts.length) return { error: 'URL nicht im Register-Korpus. Exakte URL aus register_suchen verwenden.' };
     const full = parts.map((p) => p.text).join('\n');
     const PAGE = 24000;
@@ -468,7 +444,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && url.pathname === '/api/health') {
-    return sendJson(res, 200, { ok: true, provider: cfg.PROVIDER, chunks: chunks.length, scope: CORPUS_SCOPE });
+    return sendJson(res, 200, { ok: true, provider: cfg.PROVIDER, chunks: DOC_COUNT, scope: 'fts5-vollkorpus' });
   }
 
   if (req.method === 'POST' && url.pathname === '/api/ask') {
@@ -486,8 +462,14 @@ const server = http.createServer(async (req, res) => {
           return sendJson(res, 400, { error: 'Feld "question" fehlt.' });
         }
         const picked = retrieve(question.trim());
-        // Fail-closed: ohne brauchbare Fundstellen wird gar nicht erst formuliert.
-        if (picked.length === 0 || picked[0].score < 2.0) {
+        // Fail-closed: bei leerer/quasi-leerer Trefferliste wird gar nicht erst
+        // formuliert. Die FTS5-Score-Skala trennt „stark passend" und „nur ein
+        // Allerweltswort trifft" NICHT sauber (gemessen 2026-07-23) – der
+        // eigentliche Wächter gegen thematisch unpassende Fragen ist der strikte
+        // Prompt (das Modell antwortet dann „keine ausreichende Quelle"). Die
+        // Schwelle (empirisch: echte Fragen ≥ ~22, reine Zeichenfolgen ~12)
+        // spart nur den Provider-Aufruf bei praktisch leerem Retrieval.
+        if (picked.length === 0 || picked[0].score < 15) {
           return sendJson(res, 200, {
             answer: 'Dazu enthält das Register keine ausreichende Quelle. Bitte formuliere die Frage anders oder ergänze die passende amtliche Quelle im Register.',
             sources: [], provider: cfg.PROVIDER, verified: true,
@@ -530,7 +512,7 @@ const server = http.createServer(async (req, res) => {
 
 if (!process.env.KI_NO_LISTEN) {
   server.listen(Number(cfg.PORT), cfg.HOST, () => {
-    console.log(`Steuerberater KI läuft: http://${cfg.HOST}:${cfg.PORT}  (Provider: ${cfg.PROVIDER}, ${chunks.length} Korpus-Chunks, Scope: ${CORPUS_SCOPE})`);
+    console.log(`Steuerberater KI läuft: http://${cfg.HOST}:${cfg.PORT}  (Provider: ${cfg.PROVIDER}, ${DOC_COUNT} Dokumente, FTS5-Vollkorpus)`);
   });
 }
 

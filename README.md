@@ -104,28 +104,24 @@ KI-Abfrage) und läuft als **eigener Railway-Service** neben KassenFlow:
    (Seit dem Repo-Umzug 2026-07-16 gibt es hier kein Kassen-Pre-Deploy mehr.)
 3. Variables: `GEMINI_API_KEY` (oder `PROVIDER=claude` + `ANTHROPIC_API_KEY`),
    **`KI_ACCESS_CODE=<selbstgewählter Code>`** (schützt das KI-Kontingent;
-   Register/Suche bleiben offen – amtliche Daten), `NODE_OPTIONS=--max-old-space-size=6144`
-   und **`KI_CORPUS_SCOPE`**.
-   ⚠️ **RAM-Realität seit dem Rechtsprechungs-Vollausbau (2026-07-17):** Der
-   Vollkorpus (`scope=alles`) hat **~918.000 Chunks** (83k Urteile + alle
-   Gesetzesnormen). Der BM25-Index-Bau braucht dafür **> 6 GB Heap** (lokaler
-   Boot-OOM bei 6144 verifiziert) und bootet auf dem **8-GB-Hobby-Plan NICHT**.
-   → Am Railway-Service **`KI_CORPUS_SCOPE=steuern`** setzen (Live-Standard):
-   das lässt NUR die Topic „Rechtsprechung des Bundes" (Nicht-BFH-Urteile,
-   ~551k Chunks) weg und **behält alle Gesetzestexte** – ergibt **~367.000
-   Chunks** (alle §§ von BGB/SGB/AO/UStG/EStG/… + BMF, alle Handbücher/AEAO/
-   UStAE, BZSt/DSFinV-K, VwV, EU-Recht, BFH-Rechtsprechung), Peak-RSS ~5,5 GB
-   (auf 8 GB verifiziert) und bootet in ~2–3 min.
-   ⚠️ **Fix 2026-07-21 – NIE wieder Gesetze stumm droppen:** Bis dahin filterte
-   `steuern` zusätzlich „Bundesrecht (§§)" (alle allgemeinen Gesetze) → das
-   Register fand § 615 BGB, § 96 SGB III & jeden nicht-steuerlichen Paragrafen
-   NICHT mehr, obwohl es mit „alle Bundesgesetze paragrafengenau" wirbt (stiller
-   Deckel, Regel 4). Der Live-Boot loggt jetzt laut, welche Topics/Chunks er
-   ausschließt. Härteste Notbremse für sehr kleine Instanzen:
-   **`KI_CORPUS_SCOPE=steuern-min`** (~244k, verliert die allgemeinen Gesetze –
-   nur wählen, wenn `steuern` nicht bootet). Der VOLLE Stand bleibt im Repo +
-   Offline-Bundle erhalten. Für den Vollkorpus live: Railway-Plan mit ≥ 16 GB
-   RAM + `NODE_OPTIONS=--max-old-space-size=12288`, `scope=alles`.
+   Register/Suche bleiben offen – amtliche Daten). `NODE_OPTIONS` kann klein
+   bleiben (der Index liegt nicht mehr im RAM).
+   ✅ **FTS5-Volltextindex auf Platte (Umbau 2026-07-23) – der VOLLE Korpus ist
+   live:** Der Suchindex wird nicht mehr in den RAM geladen (das OOMte bei
+   ~918.000 Chunks), sondern als SQLite-FTS5-Datenbank **auf der Platte**
+   gehalten (`node:sqlite`, zero-dep). Messung: Bau **~2 min** bei **~0,6 GB
+   RAM**, Suche **~0,05 GB / ~60 ms**, DB-Datei **~4 GB**. Damit sind **alle
+   918k Dokumente inkl. der kompletten Rechtsprechung** (BGH/BAG/BSG/BVerwG/
+   BVerfG) live durchsuchbar – auf dem **8-GB-Hobby-Plan**, weiterhin **0 €**.
+   - **`KI_CORPUS_SCOPE` ist gegenstandslos** und kann am Railway-Dienst
+     **entfernt** werden (die Variable wird nur noch für einen Deprecation-Hinweis
+     gelesen; der volle Korpus wird immer indexiert).
+   - **Disk:** Dem Dienst müssen **~5 GB Platte** zur Verfügung stehen (Korpus
+     0,6 + Index 4). Kurz am Railway-Dashboard prüfen.
+   - **Boot:** Die Index-Datei ist **ephemer** – sie wird beim Deploy aus den
+     committeten Korpus-Shards neu gebaut (~2 min, per Fingerabdruck übersprungen,
+     wenn der Korpus unverändert ist). Kein Railway-Volume nötig; ein Volume
+     spart nur den einmaligen Bau nach einem Neustart.
 3b. `HOST` ist auf Railway automatisch `0.0.0.0` (erkennt
    `RAILWAY_PUBLIC_DOMAIN`); `PORT` setzt Railway selbst.
 4. Settings → Networking → **Generate Domain** → der Link (z. B.
