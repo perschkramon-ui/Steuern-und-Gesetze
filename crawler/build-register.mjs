@@ -83,6 +83,15 @@ function topicOf(u) {
   if (host === 'bundesfinanzhof.de') return 'BFH · Rechtsprechung';
   if (host === 'rechtsprechung-im-internet.de') return 'Rechtsprechung des Bundes';
   if (host === 'eur-lex.europa.eu') return 'EU-Recht (EUR-Lex)';
+  // Landesrecht (Ladenöffnung/Gaststätten/Nichtraucherschutz – seit der
+  // Föderalismusreform Landesrecht, über GII nicht erreichbar). OHNE diesen
+  // Zweig fielen die Einträge auf topic '' zurück: nicht gruppierbar, nicht
+  // filterbar und – weil server.mjs den Primärquellen-Boost über das Topic
+  // vergibt – strukturell unterhalb jedes Bundesgesetzes, das sie nur zitiert
+  // (Fund lokale Session 2026-07-28 am Live-Register).
+  if (host === 'gesetze-bayern.de' || host === 'recht.nrw.de' || host === 'revosax.sachsen.de') {
+    return 'Landesrecht (§§)';
+  }
   if (host === 'bundesfinanzministerium.de') {
     if ((m = /^\/Web\/DE\/Themen\/Steuern\/([^/]+)/i.exec(path))) {
       const map = {
