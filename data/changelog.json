@@ -1,5 +1,135 @@
 [
  {
+  "date": "2026-07-28T11:38:11.857Z",
+  "neu": 0,
+  "geaendert": 0,
+  "entfallen": 0,
+  "beispieleNeu": [],
+  "beispieleGeaendert": []
+ },
+ {
+  "date": "2026-07-28T11:26:23.744Z",
+  "neu": 35,
+  "geaendert": 3,
+  "entfallen": 19,
+  "beispieleNeu": [
+   {
+    "title": "AABeamtWidAnO – Anordnung zur Übertragung der Zuständigkeit für den Erlass von Widerspruchsbescheiden aus dem Beamtenverhältnis bezüglich Beamtinnen und Beamten des Auswärtige…",
+    "url": "https://www.gesetze-im-internet.de/aabeamtwidano/"
+   },
+   {
+    "title": "ABüFöG – Gesetz zur befristeten Förderung einer Aktivierung des Bauüberhangs",
+    "url": "https://www.gesetze-im-internet.de/ab_f_g/"
+   },
+   {
+    "title": "Anpassungsverfahrensabweichungsgesetz 2026 – Gesetz zur Abweichung von dem Anpassungsverfahren gemäß § 11 Absatz 4 des Abgeordnetengesetzes für das Jahr 2026",
+    "url": "https://www.gesetze-im-internet.de/anpvfabwg_2026/"
+   },
+   {
+    "title": "BfAABeamtWidAnO – Anordnung zur Übertragung der Zuständigkeit für den Erlass von Widerspruchsbescheiden aus dem Beamtenverhältnis bezüglich Beamtinnen und Beamten des Bundesamts…",
+    "url": "https://www.gesetze-im-internet.de/bfaabeamtwidano/"
+   },
+   {
+    "title": "BMJVVertrAnO – Anordnung über die Vertretung der Bundesrepublik Deutschland im Geschäftsbereich des Bundesministeriums der Justiz und für Verbraucherschutz",
+    "url": "https://www.gesetze-im-internet.de/bmjvvertrano_2026/"
+   },
+   {
+    "title": "StromVKG – Gesetz zur Sicherung der Versorgungssicherheit Strom und zur Bereitstellung neuer Kapazitäten",
+    "url": "https://www.gesetze-im-internet.de/stromvkg/"
+   },
+   {
+    "title": "⏳ AbfAEV: Änderung durch Art. 3 Abs. 1 G v. 13.7.2026 I Nr. 207 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/abfaev/"
+   },
+   {
+    "title": "⏳ AbfBeauftrV: Änderung durch Art. 3 Abs. 3 G v. 13.7.2026 I Nr. 207 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/abfbeauftrv_2017/"
+   },
+   {
+    "title": "⏳ BioAbfV: Änderung durch Art. 6 G v. 13.7.2026 I Nr. 207 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/bioabfv/"
+   },
+   {
+    "title": "⏳ BNetzABGebV: Änderung durch Art. 2 G v. 21.7.2026 I Nr. 210a textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/bnetzabgebv/"
+   },
+   {
+    "title": "⏳ EfbV: Änderung durch Art. 3 Abs. 2 G v. 13.7.2026 I Nr. 207 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/efbv_2017/"
+   },
+   {
+    "title": "⏳ EMVG: Änderung durch Art. 1 G v. 20.7.2026 I Nr. 214 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/emvg_2016/"
+   },
+   {
+    "title": "⏳ EnVKG: Änderung durch Art. 3 G v. 20.7.2026 I Nr. 215 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/envkg_2012/"
+   },
+   {
+    "title": "⏳ EWKFondsG: Änderung durch Art. 5 G v. 13.7.2026 I Nr. 207 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/ewkfondsg/"
+   },
+   {
+    "title": "⏳ EWKVerbotsV: Änderung durch Art. 3 Abs. 5 G v. 13.7.2026 I Nr. 207 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/ewkverbotsv/"
+   },
+   {
+    "title": "⏳ FuAG: Änderung durch Art. 2 G v. 20.7.2026 I Nr. 214 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/fuag/"
+   },
+   {
+    "title": "⏳ GewAbfV: Änderung durch Art. 3 Abs. 4 G v. 13.7.2026 I Nr. 207 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/gewabfv_2017/"
+   },
+   {
+    "title": "⏳ GewAnzV: Änderung durch Art. 7 G v. 20.7.2026 I Nr. 215 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/gewanzv_2014/"
+   },
+   {
+    "title": "⏳ GewO: Änderung durch Art. 1 G v. 20.7.2026 I Nr. 215 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/gewo/"
+   },
+   {
+    "title": "⏳ GWB: Mittelbare Änderung durch Art. 10 G v. 20.7.2026 I Nr. 215 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/gwb/"
+   },
+   {
+    "title": "⏳ HwO: Änderung durch Art. 8 G v. 20.7.2026 I Nr. 215 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/hwo/"
+   },
+   {
+    "title": "⏳ IHKG: Änderung durch Art. 6 G v. 20.7.2026 I Nr. 215 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/ihkg/"
+   },
+   {
+    "title": "⏳ InvKG: Änderung durch Art. 5 G v. 20.7.2026 I Nr. 215 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/invkg/"
+   },
+   {
+    "title": "⏳ KrWG: Änderung durch Art. 2 G v. 13.7.2026 I Nr. 207 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/krwg/"
+   },
+   {
+    "title": "⏳ MaBV: Änderung durch Art. 2 G v. 20.7.2026 I Nr. 215 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/gewo_34cdv/"
+   }
+  ],
+  "beispieleGeaendert": [
+   {
+    "title": "⏳ BGB: Änderung durch Art. 1 G v. 16.7.2026 I Nr. 212 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/bgb/"
+   },
+   {
+    "title": "⏳ BGBEG: Änderung durch Art. 2 G v. 16.7.2026 I Nr. 212 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/bgbeg/"
+   },
+   {
+    "title": "⏳ KWG: Änderung durch Art. 7 G v. 9.4.2026 I Nr. 97 textlich nachgewiesen, dokumentarisch noch nicht abschließend bearbeitet",
+    "url": "https://www.gesetze-im-internet.de/kredwg/"
+   }
+  ]
+ },
+ {
   "date": "2026-07-18T01:38:52.624Z",
   "neu": 7317,
   "geaendert": 73,

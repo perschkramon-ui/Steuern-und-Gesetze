@@ -35,9 +35,14 @@ Wöchentlich das Register frisch bauen und die Änderungen per PR einspielen
    Sandbox-Proxy sonst nicht. `--pdfjs` nur nötig, wenn pdfjs-dist nicht unter
    `../node_modules/pdfjs-dist` liegt.)
 3. **Erfolgskontrolle (Pflicht):** `meta.counts` dürfen NICHT sinken
-   (Referenz nach dem Vollausbau 2026-07-18: gesetzeIndex 6123 · seiten 8908 ·
-   pdfs 7424 · korpusChunks 917943 · urteile 83497). Sinkt ein Wert → NICHT
+   (Referenz nach dem EU-Ingest 2026-07-28: gesetzeIndex 6122 · seiten 8918 ·
+   pdfs 7424 · korpusChunks 919711 · urteile 83618). Sinkt ein Wert → NICHT
    committen, Ursache klären.
+   **`gesetzeIndex` darf legitim sinken**, wenn GII Gesetze aus dem Vollindex
+   nimmt (Aufhebung/Delistung). Das ist KEIN Freibrief: die Differenz muss
+   namentlich gegen die Quelle belegt werden (URL 404 **oder** nicht mehr in der
+   `Teilliste_<Buchstabe>.html`), erst dann die Referenz hier nachziehen. Beleg
+   zum 28.07.2026 in `docs/SESSION-LOG.md`.
    ```bash
    node -e "console.log(JSON.parse(require('fs').readFileSync('data/register.json','utf8')).meta.counts)"
    ```
