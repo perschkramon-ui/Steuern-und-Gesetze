@@ -4,6 +4,7 @@
  *
  *   node crawler/update-all.mjs               (aus dem Ordner steuerberater-ki)
  *   Optionen: --skip-bmf true | --skip-bmjv true | --skip-gii true
+ *             --skip-landesrecht true
  *             --pdfjs <dir>   (Default: ../node_modules/pdfjs-dist im Repo)
  *
  * Ablauf:
@@ -60,6 +61,12 @@ const AUSBAU_QUELLEN = [
   ['bundesfinanzhof.de', 'bfh'],
   ['rechtsprechung-im-internet.de', 'rii'],
   ['eur-lex.europa.eu', 'eu'],
+  // Landesrecht (Ladenöffnung/Gaststätten/Nichtraucherschutz). Je HOST ein
+  // Eintrag – der Restore läuft hostweise, ein Sammeleintrag würde die Quellen
+  // beim nächsten Lauf im Container nicht wiederherstellen.
+  ['gesetze-bayern.de', 'lr-by'],
+  ['recht.nrw.de', 'lr-nw'],
+  ['revosax.sachsen.de', 'lr-sn'],
 ];
 const RESTORE = [
   ['bundesfinanzministerium.de', 'bmf-restored-cache'],
@@ -101,6 +108,14 @@ try { run('fetch-eu-recht.mjs', '--out', '../eu-cache'); }
 catch (e) { console.warn('EU-Refresh übersprungen:', e.message); }
 try { run('fetch-rii.mjs', '--out', '../rii-cache', '--refresh-toc', 'true', '--since', since); }
 catch (e) { console.warn('RII-Delta übersprungen:', e.message); }
+// Landesrecht: 6 kleine Abrufe (Bayern + NRW). Ladenschluss- und
+// Gaststättenrecht sind seit der Föderalismusreform Landesrecht und über GII
+// NICHT erreichbar; die übrigen 14 Länder sperren generische Crawler per
+// robots.txt (juris-Plattform) – Details im Kopf von fetch-landesrecht.mjs.
+if (args['skip-landesrecht'] !== 'true') {
+  try { run('fetch-landesrecht.mjs', '--root', '..'); }
+  catch (e) { console.warn('Landesrecht-Refresh übersprungen:', e.message); }
+}
 
 // 4. PDF-Texte (nur Neues – extract-pdf ist resumierbar). ALLE frischen
 //    Crawl-Caches mit pdfmeta.jsonl abdecken – die frühere Fest-Liste
