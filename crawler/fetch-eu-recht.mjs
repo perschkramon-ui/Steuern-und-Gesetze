@@ -106,9 +106,16 @@ for (const doc of DOCS) {
     out.push({
       url: anzeigeUrl, finalUrl: anzeigeUrl, kind: 'content', from: '(eu-recht/cellar)',
       fetchedAt: new Date().toISOString(),
-      title: `${doc.kurz} — konsolidierte Fassung ${stand}`, h1: title,
+      // build-register bevorzugt h1 VOR title (build-register.mjs:286) – der
+      // kuratierte Name muss deshalb auch ins h1. Sonst steht im Register nur
+      // der CELLAR-Seitentitel „Konsolidierter TEXT: 32016R0679 — DE" und die
+      // Rechtsakte sind unter ihrem geläufigen Namen nicht über den Titel
+      // auffindbar (gemessen 2026-07-28: 0 Titel-Treffer für „DSGVO" und
+      // „PSD2", obwohl beide im Register lagen).
+      title: `${doc.kurz} — konsolidierte Fassung ${stand}`,
+      h1: `${doc.kurz} — konsolidierte Fassung ${stand}`,
       // Attribution (Beschluss 2011/833/EU Art. 4 / CC BY 4.0): Quelle nennen.
-      description: `Amtliche konsolidierte Fassung (DE), Stand ${stand}. Quelle: Amt für Veröffentlichungen der EU (CELLAR); © European Union, https://eur-lex.europa.eu — Weiterverwendung gem. Beschluss 2011/833/EU.`,
+      description: `Amtliche konsolidierte Fassung (DE), Stand ${stand}. Amtlicher Titel: ${title}. Quelle: Amt für Veröffentlichungen der EU (CELLAR); © European Union, https://eur-lex.europa.eu — Weiterverwendung gem. Beschluss 2011/833/EU.`,
       date: stand, text,
     });
     console.log(`OK ${celex} (${stand}): ${text.length} Zeichen — ${doc.kurz}`);
