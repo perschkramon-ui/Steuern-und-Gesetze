@@ -126,5 +126,31 @@ for (const doc of DOCS) {
 }
 
 if (!out.length) throw new Error('Kein einziges EU-Dokument abrufbar – EU-Cache NICHT überschrieben.');
-fs.writeFileSync(path.join(OUT, 'pages.jsonl'), out.map((e) => JSON.stringify(e)).join('\n') + '\n');
-console.log(`FERTIG: ${out.length}/${DOCS.length} EU-Dokumente (${nErr} übersprungen) → ${path.join(OUT, 'pages.jsonl')}`);
+
+// MERGE statt Überschreiben: der bestehende Cache-Inhalt bleibt für Rechtsakte
+// erhalten, die in DIESEM Lauf ausgefallen sind.
+//
+// Vorher wurde pages.jsonl komplett neu geschrieben – ein einzelner
+// vorübergehender Upstream-Fehler löschte damit einen Rechtsakt aus dem
+// Register. Genau so passiert am 2026-07-28: „SPARQL HTTP 503 für 01998L0006"
+// → die Preisangaben-Richtlinie 98/6/EG fiel still aus dem Register. Der
+// Zähler-Gate fing es NICHT, weil gleichzeitig drei Landesgesetze dazukamen
+// und `seiten` unterm Strich stieg (Fehlerklasse „stiller Deckel").
+// Der Restore-Pfad rettet das NICHT: er kennt nur, was beim letzten Build
+// bereits im Register stand – für frisch aufgenommene Quellen also nichts.
+const outFile = path.join(OUT, 'pages.jsonl');
+const merged = new Map();
+try {
+  for (const line of fs.readFileSync(outFile, 'utf8').split('\n')) {
+    if (line.trim()) { const e = JSON.parse(line); merged.set(e.url, e); }
+  }
+} catch { /* Erstlauf: noch kein Cache */ }
+const behalten = merged.size;
+for (const e of out) merged.set(e.url, e);
+fs.writeFileSync(outFile, [...merged.values()].map((e) => JSON.stringify(e)).join('\n') + '\n');
+if (nErr) {
+  console.warn(`⚠️ ${nErr} Rechtsakt(e) in diesem Lauf nicht abrufbar – vorheriger ` +
+    `Cache-Stand bleibt dafür erhalten (${merged.size} Einträge gesamt, ${behalten} vorher vorhanden).`);
+}
+console.log(`FERTIG: ${out.length}/${DOCS.length} EU-Dokumente frisch (${nErr} übersprungen), ` +
+  `${merged.size} im Cache → ${outFile}`);

@@ -1,5 +1,39 @@
 [
  {
+  "date": "2026-07-28T20:41:46.421Z",
+  "neu": 1,
+  "geaendert": 0,
+  "entfallen": 0,
+  "beispieleNeu": [
+   {
+    "title": "Preisangaben-Richtlinie 98/6/EG — konsolidierte Fassung 28.05.2022",
+    "url": "https://eur-lex.europa.eu/legal-content/DE/TXT/HTML/?uri=CELEX:01998L0006-20220528"
+   }
+  ],
+  "beispieleGeaendert": []
+ },
+ {
+  "date": "2026-07-28T20:32:32.866Z",
+  "neu": 3,
+  "geaendert": 0,
+  "entfallen": 1,
+  "beispieleNeu": [
+   {
+    "title": "Bayerisches Feiertagsgesetz (FTG) — Fassung 21. Mai 1980",
+    "url": "https://www.gesetze-bayern.de/Content/Document/BayFTG/true"
+   },
+   {
+    "title": "Feiertagsgesetz NRW (Sonn- und Feiertage) — Fassung 01.01.2000",
+    "url": "https://recht.nrw.de/lrgv/gesetz/01012000-bekanntmachung-der-neufassung-des-gesetzes-ueber-die-sonn-und-feiertage/"
+   },
+   {
+    "title": "Sächsisches Sonn- und Feiertagsgesetz (SächsSFG) — Fassung 7. Mai 2025",
+    "url": "https://www.revosax.sachsen.de/vorschrift/3997-SaechsSFG"
+   }
+  ],
+  "beispieleGeaendert": []
+ },
+ {
   "date": "2026-07-28T19:37:09.619Z",
   "neu": 3,
   "geaendert": 0,

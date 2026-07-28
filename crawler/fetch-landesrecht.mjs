@@ -62,9 +62,10 @@
  * gemeinfrei. Als Anzeige-Link kommt die amtliche Portal-URL ins Register.
  *
  * Aufruf:  node fetch-landesrecht.mjs [--root ..] [--delay 1500]
- * Schreibt je Quelle <root>/<key>-cache/pages.jsonl (lr-by, lr-nw), passend zu
- * AUSBAU_QUELLEN in update-all.mjs.
- * Idempotent: schreibt die pages.jsonl je Quelle komplett neu.
+ * Schreibt je Quelle <root>/<key>-cache/pages.jsonl (lr-by, lr-nw, lr-sn,
+ * lr-bb), passend zu AUSBAU_QUELLEN in update-all.mjs.
+ * Idempotent, aber MERGEND: erfolgreiche Abrufe überschreiben ihren Eintrag,
+ * in diesem Lauf ausgefallene Normen behalten den vorherigen Cache-Stand.
  */
 
 import fs from 'node:fs';
@@ -109,6 +110,12 @@ const DOCS = [
   { quelle: 'bb', id: 'bbgloeg', pruef: 'Ladenöffnungsgesetz', kurz: 'Brandenburgisches Ladenöffnungsgesetz (BbgLöG)' },
   { quelle: 'bb', id: 'bbggastg', pruef: 'Gaststättengesetz', kurz: 'Brandenburgisches Gaststättengesetz (BbgGastG)' },
   { quelle: 'bb', id: 'bbgnirschg', pruef: 'Passivrauchen', kurz: 'Brandenburgisches Nichtraucherschutzgesetz (BbgNiRSchG)' },
+  // --- Feiertagsgesetze: bestimmen, WELCHE Tage Sonn-/Feiertage sind, und
+  //     steuern damit unmittelbar die Ladenöffnung. Ohne sie bleibt das
+  //     Ladenöffnungsrecht der Länder auf halber Strecke stehen.
+  { quelle: 'by', id: 'BayFTG', pruef: 'FTG', kurz: 'Bayerisches Feiertagsgesetz (FTG)' },
+  { quelle: 'nw', id: '26532', kurz: 'Feiertagsgesetz NRW (Sonn- und Feiertage)' },
+  { quelle: 'sn', id: '3997-SaechsSFG', pruef: 'Sonn- und Feiertage', kurz: 'Sächsisches Sonn- und Feiertagsgesetz (SächsSFG)' },
 ];
 
 const QUELLEN = {
@@ -257,15 +264,35 @@ for (const doc of DOCS) {
   }
 }
 
-// Je Quelle nur schreiben, wenn dort etwas ankam – sonst bliebe eine leere
-// pages.jsonl stehen und build-register würde den Bestand still ausdünnen.
-let geschrieben = 0;
+// MERGE statt Überschreiben, je Quelle: was in DIESEM Lauf ausfiel, bleibt mit
+// dem vorherigen Cache-Stand erhalten. Ein einzelner Portal-Ausfall (Wartung,
+// 503, Timeout) darf eine Norm nicht still aus dem Register löschen – genau das
+// ist am 2026-07-28 dem EU-Crawler passiert (SPARQL 503 → Preisangaben-RL
+// 98/6/EG weg, vom Zähler-Gate NICHT gefangen, weil gleichzeitig andere Quellen
+// wuchsen). Der Restore-Pfad rettet das nicht: er kennt nur, was beim letzten
+// Build schon im Register stand.
+let geschrieben = 0, erhalten = 0;
 for (const [quelle, eintraege] of Object.entries(out)) {
   const dir = path.join(ROOT, `${QUELLEN[quelle].key}-cache`);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'pages.jsonl'), eintraege.map((e) => JSON.stringify(e)).join('\n') + '\n');
-  console.log(`  → ${eintraege.length} Einträge in ${path.join(dir, 'pages.jsonl')}`);
+  const datei = path.join(dir, 'pages.jsonl');
+  const merged = new Map();
+  try {
+    for (const line of fs.readFileSync(datei, 'utf8').split('\n')) {
+      if (line.trim()) { const e = JSON.parse(line); merged.set(e.url, e); }
+    }
+  } catch { /* Erstlauf */ }
+  const vorher = merged.size;
+  for (const e of eintraege) merged.set(e.url, e);
+  fs.writeFileSync(datei, [...merged.values()].map((e) => JSON.stringify(e)).join('\n') + '\n');
+  console.log(`  → ${eintraege.length} frisch, ${merged.size} gesamt in ${datei}`);
   geschrieben += eintraege.length;
+  erhalten += Math.max(0, merged.size - eintraege.length);
+  void vorher;
 }
 if (!geschrieben) throw new Error('Kein einziges Landesrecht-Dokument abrufbar – Caches NICHT überschrieben.');
-console.log(`FERTIG: ${geschrieben}/${DOCS.length} Landesnormen (${nErr} übersprungen)`);
+if (nErr) {
+  console.warn(`⚠️ ${nErr} Norm(en) in diesem Lauf nicht abrufbar – vorheriger Cache-Stand ` +
+    `bleibt dafür erhalten (${erhalten} Einträge aus früheren Läufen übernommen).`);
+}
+console.log(`FERTIG: ${geschrieben}/${DOCS.length} Landesnormen frisch (${nErr} übersprungen)`);

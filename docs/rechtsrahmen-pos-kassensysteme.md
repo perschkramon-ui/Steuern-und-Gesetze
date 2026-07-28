@@ -82,6 +82,8 @@ Sonntage, Sperrzeit, Rauchverbot in Gaststätten.
 | **Brandenburg** | BbgLöG (25.04.2017) | BbgGastG (02.10.2008) | BbgNiRSchG (25.01.2016) | ✓ ⁴ |
 | **übrige 12 Länder** | — | — | — | ❌ ⁵ |
 
+**Feiertagsgesetze** (bestimmen, welche Tage Sonn-/Feiertage sind → steuern die Ladenöffnung): Bayern FTG (21.05.1980) ✓ · NRW Sonn- und Feiertage (01.01.2000) ✓ · Sachsen SächsSFG (07.05.2025) ✓ · Brandenburg ❌ (Kürzel nicht gefunden, s. ⁵).
+
 ---
 
 ### Fußnoten / Lücken & Stand
@@ -114,7 +116,7 @@ maßgebliche Norm EN 16931 ist ohnehin eine (kostenpflichtige) DIN/CEN-Norm
 außerhalb des amtlichen Korpus.
 
 **⁴ Landesrecht – live im Register seit 2026-07-28** (`crawler/fetch-landesrecht.mjs`,
-12 Normen aus 4 Ländern). Die Anker sind novellenfest gewählt: Bayern über das
+15 Normen aus 4 Ländern, inkl. Feiertagsgesetze). Die Anker sind novellenfest gewählt: Bayern über das
 stabile Dokument-Kürzel (`/Content/Document/<Kürzel>/true` – ohne `/true` kommt
 nur das Inhaltsverzeichnis), NRW über die taxonomy-ID hinter „Link zur
 aktuellsten Fassung" (die Sitemap führt auch historische Fassungen), Sachsen
