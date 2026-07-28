@@ -66,6 +66,7 @@ const AUSBAU_QUELLEN = [
   // beim nächsten Lauf im Container nicht wiederherstellen.
   ['gesetze-bayern.de', 'lr-by'],
   ['recht.nrw.de', 'lr-nw'],
+  ['revosax.sachsen.de', 'lr-sn'],
 ];
 const RESTORE = [
   ['bundesfinanzministerium.de', 'bmf-restored-cache'],

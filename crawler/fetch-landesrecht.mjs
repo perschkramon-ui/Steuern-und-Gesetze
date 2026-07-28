@@ -6,17 +6,34 @@
  * und Gaststättenrecht sind seit der Föderalismusreform Landesrecht und damit
  * über gesetze-im-internet.de NICHT erreichbar.
  *
- * ABDECKUNG (Stand 2026-07-28): nur Bayern + Nordrhein-Westfalen.
- * Grund ist NICHT technischer Aufwand, sondern robots.txt: die übrigen 14
- * Länder liegen auf der juris-Plattform (landesrecht-bw.de, gesetze.berlin.de,
- * landesrecht-hamburg.de, rv.hessenrecht.hessen.de … – alle mit identischer
- * robots.txt: Whitelist für Googlebot/Bingbot/CCBot & Co., danach
- * „User-agent: * / Disallow: /"). Für die gilt der Ausweichweg über die
- * Gesetz- und Verordnungsblätter der Länder (PDF auf landeseigenen Servern)
- * oder Link-only-Einträge – bewusst NICHT hier, sondern als eigener Schritt.
+ * ABDECKUNG (Stand 2026-07-28): Bayern, Nordrhein-Westfalen, Sachsen.
+ * Alle 16 Landesportale wurden einzeln auf robots.txt geprüft – die Grenze ist
+ * NICHT technischer Aufwand:
+ *
+ *   GESPERRT (10) – juris-Plattform, alle mit identischer robots.txt
+ *   (Whitelist für Googlebot/Bingbot/Applebot/CCBot & Co., danach
+ *   „User-agent: * / Disallow: /"): landesrecht-bw.de, gesetze.berlin.de,
+ *   landesrecht-hamburg.de, rv.hessenrecht.hessen.de, landesrecht-mv.de,
+ *   landesrecht.rlp.de, recht.saarland.de, landesrecht.sachsen-anhalt.de,
+ *   gesetze-rechtsprechung.sh.juris.de, landesrecht.thueringen.de.
+ *
+ *   ERLAUBT, aber OHNE stabile Direkt-URLs (3) – hier fehlt nicht die
+ *   Erlaubnis, sondern ein verlässlicher Anker; Discovery ginge nur über
+ *   Session-/JS-Handling, das ein schlanker Crawler nicht tragen sollte:
+ *     bravors.brandenburg.de – robots erlaubt (Crawl-delay 20!), aber
+ *       geratene Pfade liefern 37-Byte-Stubs, der Fundstellennachweis
+ *       verlinkt nicht direkt, die POST-Schnellsuche antwortet 302 (Session).
+ *     nds-voris.de – kein robots.txt (= erlaubt), aber keine Sitemap und
+ *       /search läuft ins 404: Wolters-Kluwer-App, clientseitig.
+ *     transparenz.bremen.de – leeres robots.txt (= erlaubt), Vorschriften nur
+ *       über sixcms-Suchparameter erreichbar.
+ *   Für diese drei und die gesperrten zehn bleibt der Ausweichweg über die
+ *   Gesetz- und Verordnungsblätter (PDF auf landeseigenen Servern) oder
+ *   Link-only-Einträge – bewusst als eigener Schritt, nicht hier.
+ *
  * Vor jeder Erweiterung die robots.txt des Ziel-Portals einzeln prüfen.
  *
- * ZWEI ZUGRIFFSMUSTER, beide 2026-07-28 live verprobt:
+ * DREI ZUGRIFFSMUSTER, alle 2026-07-28 live verprobt:
  *   Bayern  gesetze-bayern.de – robots.txt „Allow: /", KEINE Sitemap.
  *           Stabile Dokument-URL /Content/Document/<Kürzel>. Die Seite trägt
  *           immer die geltende Fassung, das Kürzel ändert sich bei Novellen
@@ -28,6 +45,13 @@
  *           /taxonomy/term/<id>; diese ID ist novellenfest und liefert per
  *           Meta-Refresh die jeweils geltende Fassung → ID kuratieren, Crawler
  *           löst je Lauf auf.
+ *   Sachsen revosax.sachsen.de – robots.txt vollständig auskommentiert (also
+ *           erlaubt) + Sitemap mit 6315 URLs. Stabile Vorschriften-URL
+ *           /vorschrift/<id>-<Name>; die Seite trägt die rechtsbereinigte
+ *           Fassung („Rechtsbereinigt mit Stand vom …"). Achtung: revosax
+ *           liefert KEIN <title>-Element – der Name steht nur im <h1>.
+ *
+ * Schreibt <root>/lr-by-cache, lr-nw-cache, lr-sn-cache.
  *
  * Rechtlich: Landesgesetze und -verordnungen sind amtliche Werke (§ 5 UrhG),
  * gemeinfrei. Als Anzeige-Link kommt die amtliche Portal-URL ins Register.
@@ -72,11 +96,16 @@ const DOCS = [
   { quelle: 'nw', id: '29216', kurz: 'Ladenöffnungsgesetz NRW (LÖG NRW)' },
   { quelle: 'nw', id: '26759', kurz: 'Gaststättenverordnung NRW (GastV NRW)' },
   { quelle: 'nw', id: '29454', kurz: 'Nichtraucherschutzgesetz NRW (NiSchG NRW)' },
+  // --- Sachsen (Vorschriften-ID; Seite trägt die rechtsbereinigte Fassung) ---
+  { quelle: 'sn', id: '11548-Saechsisches-Ladenoeffnungsgesetz', pruef: 'Ladenöffnungsgesetz', kurz: 'Sächsisches Ladenöffnungsgesetz (SächsLadÖffG)' },
+  { quelle: 'sn', id: '12033-Saechsisches-Gaststaettengesetz', pruef: 'Gaststättengesetz', kurz: 'Sächsisches Gaststättengesetz (SächsGastG)' },
+  { quelle: 'sn', id: '9706-Saechsisches-Nichtraucherschutzgesetz', pruef: 'Nichtraucherschutzgesetz', kurz: 'Sächsisches Nichtraucherschutzgesetz (SächsNSG)' },
 ];
 
 const QUELLEN = {
   by: { key: 'lr-by', host: 'gesetze-bayern.de', land: 'Bayern' },
   nw: { key: 'lr-nw', host: 'recht.nrw.de', land: 'Nordrhein-Westfalen' },
+  sn: { key: 'lr-sn', host: 'revosax.sachsen.de', land: 'Sachsen' },
 };
 
 async function get(url) {
@@ -143,6 +172,25 @@ async function fetchNw(doc) {
   };
 }
 
+async function fetchSn(doc) {
+  const url = `https://www.revosax.sachsen.de/vorschrift/${doc.id}`;
+  const { html, finalUrl } = await get(url);
+  // revosax liefert KEIN <title>-Element – der Name steht nur im <h1>.
+  const title = pick(/<h1[^>]*>([\s\S]*?)<\/h1>/i, html);
+  if (!new RegExp(doc.pruef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(title)) {
+    throw new Error(`h1 nennt "${doc.pruef}" nicht – ID zeigt auf etwas anderes? (${title.slice(0, 90)})`);
+  }
+  return {
+    url: finalUrl, title,
+    // „Rechtsbereinigt mit Stand vom …" = amtlicher Konsolidierungsstand.
+    stand: pick(/Rechtsbereinigt mit Stand vom\s+([^<]{3,40})/i, html) ||
+      pick(/Fassung gültig ab:\s*([^<]{3,40})/i, html),
+    text: zuText(html),
+  };
+}
+
+const HOLER = { by: fetchBy, nw: fetchNw, sn: fetchSn };
+
 const out = {};
 let nErr = 0;
 for (const doc of DOCS) {
@@ -150,7 +198,7 @@ for (const doc of DOCS) {
   // die übrigen Länder nicht mitreißen; der Bestand bleibt über data/ + Restore.
   try {
     await sleep(DELAY);
-    const r = doc.quelle === 'by' ? await fetchBy(doc) : await fetchNw(doc);
+    const r = await HOLER[doc.quelle](doc);
     if (r.text.length < 2000) throw new Error(`nur ${r.text.length} Zeichen Text – Fehlerseite statt Norm?`);
     const q = QUELLEN[doc.quelle];
     (out[doc.quelle] = out[doc.quelle] || []).push({
