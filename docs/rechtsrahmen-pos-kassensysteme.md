@@ -67,6 +67,21 @@ Finanzamt **über ELSTER** zu melden (Anschaffung/Außerbetriebnahme):
 | **E-Rechnungs-RL 2014/55/EU** (Norm EN 16931) | Grundlage strukturierter E-Rechnung | Norm referenziert ³ |
 | **DSGVO, ePrivacy, Verbraucherrechte-RL, Preisangaben-RL, UGP-RL, GPSR, PSD2, AI Act** | Datenschutz/Verbraucher/Zahlung/KI rund um die Kasse | ✓ ² |
 
+## G. Landesrecht (unmittelbar betriebsrelevant)
+
+Ladenschluss- und Gaststättenrecht sind seit der Föderalismusreform **Landesrecht**
+und über `gesetze-im-internet.de` grundsätzlich **nicht** erreichbar — für den
+Kassenbetrieb sind es aber die Normen des Alltags: Öffnungszeiten, verkaufsoffene
+Sonntage, Sperrzeit, Rauchverbot in Gaststätten.
+
+| Land | Ladenöffnung | Gaststätten | Nichtraucherschutz | Register |
+|---|---|---|---|---|
+| **Bayern** | BayLadSchlG (25.07.2025) | BayGastV (23.02.2016) | GSG (23.07.2010) | ✓ ⁴ |
+| **Nordrhein-Westfalen** | LÖG NRW (30.03.2018) | GastV NRW (30.04.2005) | NiSchG NRW (01.05.2013) | ✓ ⁴ |
+| **Sachsen** | SächsLadÖffG (01.12.2020) | SächsGastG (25.05.2018) | SächsNSG (26.07.2018) | ✓ ⁴ |
+| **Brandenburg** | BbgLöG (25.04.2017) | BbgGastG (02.10.2008) | BbgNiRSchG (25.01.2016) | ✓ ⁴ |
+| **übrige 12 Länder** | — | — | — | ❌ ⁵ |
+
 ---
 
 ### Fußnoten / Lücken & Stand
@@ -85,12 +100,40 @@ Lizenzlage, nicht robots). Eine Volltext-Aufnahme wäre nur mit BSI-Lizenz
 zulässig.
 
 **² DSGVO & weitere EU-Rechtsakte:** per `crawler/fetch-eu-recht.mjs`
-ergänzt (2026-07-23); live im Register nach dem nächsten Voll-Rebuild.
+ergänzt (2026-07-23), **live im Register seit dem Rebuild am 2026-07-28**
+(13/13 Rechtsakte, EU-Chunks 270 → 959). Konsolidierungsstände: MwStSystRL
+14.04.2025 · MwSt-DVO 282/2011 14.04.2025 · Verbrauchsteuer-SystRL 26.04.2022 ·
+DSGVO 04.05.2016 · ePrivacy 19.12.2009 · Verbraucherrechte-RL 27.09.2026 ·
+Preisangaben-RL 98/6/EG 28.05.2022 · UGP-RL 27.09.2026 · GPSR 29.05.2026 ·
+DSA 27.10.2022 · DMA 12.10.2022 · PSD2 17.01.2025 · AI Act 12.07.2024.
+Der Crawler zieht je Lauf den neuesten Stand über den SPARQL-Endpoint nach.
 
 **³ E-Rechnungs-RL 2014/55/EU:** über EUR-Lex/CELLAR nur ohne abrufbare
 konsolidierte Fassung (404) – daher (noch) nicht als Volltext ingestiert; die
 maßgebliche Norm EN 16931 ist ohnehin eine (kostenpflichtige) DIN/CEN-Norm
 außerhalb des amtlichen Korpus.
+
+**⁴ Landesrecht – live im Register seit 2026-07-28** (`crawler/fetch-landesrecht.mjs`,
+12 Normen aus 4 Ländern). Die Anker sind novellenfest gewählt: Bayern über das
+stabile Dokument-Kürzel (`/Content/Document/<Kürzel>/true` – ohne `/true` kommt
+nur das Inhaltsverzeichnis), NRW über die taxonomy-ID hinter „Link zur
+aktuellsten Fassung" (die Sitemap führt auch historische Fassungen), Sachsen
+über die Vorschriften-ID (rechtsbereinigte Fassung), Brandenburg über
+`/gesetze/<kürzel>`. Der Crawler verifiziert bei **jedem** Lauf Titel und
+Textlänge – nötig, weil BRAVORS auf jede unbekannte URL HTTP 200 antwortet.
+
+**⁵ Übrige 12 Länder – nicht ingestiert, Grund je Land geprüft (2026-07-28).**
+**Zehn sperren generische Crawler per robots.txt** (juris-Plattform, identisches
+Muster „Whitelist für Googlebot/Bingbot/CCBot & Co., danach `User-agent: * /
+Disallow: /`"): Baden-Württemberg, Berlin, Hamburg, Hessen,
+Mecklenburg-Vorpommern, Rheinland-Pfalz, Saarland, Sachsen-Anhalt,
+Schleswig-Holstein, Thüringen. **Zwei erlauben das Crawlen, bieten aber keinen
+stabilen Anker:** `nds-voris.de` (kein robots.txt = erlaubt, aber keine Sitemap,
+`/search` und `/browse` laufen ins 404 – clientseitige App) und
+`transparenz.bremen.de` (leeres robots.txt = erlaubt, Vorschriften nur über
+sixcms-Suchparameter). Ausweichweg für alle zwölf: Gesetz- und
+Verordnungsblätter der Länder (PDF auf landeseigenen Servern) oder
+Link-only-Einträge – bislang **nicht** umgesetzt.
 
 **Aktualität:** § 146a/§ 146b/§ 147 AO Stand 10.02.2026; KassenSichV Stand
 14.01.2026; DSFinV-K amtlich v2.5 (Register: v2.4 – Update ausstehend).

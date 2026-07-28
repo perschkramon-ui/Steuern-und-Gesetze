@@ -1,5 +1,26 @@
 [
  {
+  "date": "2026-07-28T19:37:09.619Z",
+  "neu": 3,
+  "geaendert": 0,
+  "entfallen": 0,
+  "beispieleNeu": [
+   {
+    "title": "Brandenburgisches Ladenöffnungsgesetz (BbgLöG) — Fassung 25. April 2017",
+    "url": "https://bravors.brandenburg.de/gesetze/bbgloeg"
+   },
+   {
+    "title": "Brandenburgisches Gaststättengesetz (BbgGastG) — Fassung 2. Oktober 2008",
+    "url": "https://bravors.brandenburg.de/gesetze/bbggastg"
+   },
+   {
+    "title": "Brandenburgisches Nichtraucherschutzgesetz (BbgNiRSchG) — Fassung 25. Januar 2016",
+    "url": "https://bravors.brandenburg.de/gesetze/bbgnirschg"
+   }
+  ],
+  "beispieleGeaendert": []
+ },
+ {
   "date": "2026-07-28T15:59:05.120Z",
   "neu": 0,
   "geaendert": 0,
