@@ -1,5 +1,147 @@
 [
  {
+  "date": "2026-07-28T13:44:37.710Z",
+  "neu": 0,
+  "geaendert": 22,
+  "entfallen": 0,
+  "beispieleNeu": [],
+  "beispieleGeaendert": [
+   {
+    "title": "MwStSystRL 2006/112/EG — konsolidierte Fassung 14.04.2025",
+    "url": "https://eur-lex.europa.eu/legal-content/DE/TXT/HTML/?uri=CELEX:02006L0112-20250414"
+   },
+   {
+    "title": "MwSt-Durchführungsverordnung (EU) 282/2011 — konsolidierte Fassung 14.04.2025",
+    "url": "https://eur-lex.europa.eu/legal-content/DE/TXT/HTML/?uri=CELEX:02011R0282-20250414"
+   },
+   {
+    "title": "Verbrauchsteuer-Systemrichtlinie (EU) 2020/262 — konsolidierte Fassung 26.04.2022",
+    "url": "https://eur-lex.europa.eu/legal-content/DE/TXT/HTML/?uri=CELEX:02020L0262-20220426"
+   },
+   {
+    "title": "Datenschutz-Grundverordnung (DSGVO) 2016/679 — konsolidierte Fassung 04.05.2016",
+    "url": "https://eur-lex.europa.eu/legal-content/DE/TXT/HTML/?uri=CELEX:02016R0679-20160504"
+   },
+   {
+    "title": "ePrivacy-Richtlinie 2002/58/EG — konsolidierte Fassung 19.12.2009",
+    "url": "https://eur-lex.europa.eu/legal-content/DE/TXT/HTML/?uri=CELEX:02002L0058-20091219"
+   },
+   {
+    "title": "Verbraucherrechte-Richtlinie 2011/83/EU — konsolidierte Fassung 27.09.2026",
+    "url": "https://eur-lex.europa.eu/legal-content/DE/TXT/HTML/?uri=CELEX:02011L0083-20260927"
+   },
+   {
+    "title": "Preisangaben-Richtlinie 98/6/EG — konsolidierte Fassung 28.05.2022",
+    "url": "https://eur-lex.europa.eu/legal-content/DE/TXT/HTML/?uri=CELEX:01998L0006-20220528"
+   },
+   {
+    "title": "Richtlinie über unlautere Geschäftspraktiken 2005/29/EG — konsolidierte Fassung 27.09.2026",
+    "url": "https://eur-lex.europa.eu/legal-content/DE/TXT/HTML/?uri=CELEX:02005L0029-20260927"
+   },
+   {
+    "title": "Allg. Produktsicherheitsverordnung (GPSR) 2023/988 — konsolidierte Fassung 29.05.2026",
+    "url": "https://eur-lex.europa.eu/legal-content/DE/TXT/HTML/?uri=CELEX:02023R0988-20260529"
+   },
+   {
+    "title": "Digital Services Act (DSA) (EU) 2022/2065 — konsolidierte Fassung 27.10.2022",
+    "url": "https://eur-lex.europa.eu/legal-content/DE/TXT/HTML/?uri=CELEX:02022R2065-20221027"
+   },
+   {
+    "title": "Digital Markets Act (DMA) (EU) 2022/1925 — konsolidierte Fassung 12.10.2022",
+    "url": "https://eur-lex.europa.eu/legal-content/DE/TXT/HTML/?uri=CELEX:02022R1925-20221012"
+   },
+   {
+    "title": "Zahlungsdiensterichtlinie 2 (PSD2) 2015/2366 — konsolidierte Fassung 17.01.2025",
+    "url": "https://eur-lex.europa.eu/legal-content/DE/TXT/HTML/?uri=CELEX:02015L2366-20250117"
+   },
+   {
+    "title": "KI-Verordnung (AI Act) (EU) 2024/1689 — konsolidierte Fassung 12.07.2024",
+    "url": "https://eur-lex.europa.eu/legal-content/DE/TXT/HTML/?uri=CELEX:02024R1689-20240712"
+   },
+   {
+    "title": "Bayerisches Ladenschlussgesetz (BayLadSchlG) — Fassung 25. Juli 2025",
+    "url": "https://www.gesetze-bayern.de/Content/Document/BayLadSchlG/true"
+   },
+   {
+    "title": "Bayerische Gaststättenverordnung (BayGastV) — Fassung 23. Februar 2016",
+    "url": "https://www.gesetze-bayern.de/Content/Document/BayGastV/true"
+   },
+   {
+    "title": "Gesundheitsschutzgesetz Bayern – Nichtraucherschutz (GSG) — Fassung 23. Juli 2010",
+    "url": "https://www.gesetze-bayern.de/Content/Document/BayGSG/true"
+   },
+   {
+    "title": "Ladenöffnungsgesetz NRW (LÖG NRW) — Fassung 30.03.2018",
+    "url": "https://recht.nrw.de/lrgv/gesetz/30032018-gesetz-zur-regelung-der-ladenoeffnungszeiten-ladenoeffnungsgesetz-loeg-nrw/"
+   },
+   {
+    "title": "Gaststättenverordnung NRW (GastV NRW) — Fassung 30.04.2005",
+    "url": "https://recht.nrw.de/lrgv/rechtsverordnung/30042005-verordnung-zur-ausfuehrung-des-gaststaettengesetzes/"
+   },
+   {
+    "title": "Nichtraucherschutzgesetz NRW (NiSchG NRW) — Fassung 01.05.2013",
+    "url": "https://recht.nrw.de/lrgv/gesetz/01052013-gesetz-zum-schutz-von-nichtraucherinnen-und-nichtrauchern-nordrhein-westfalen/"
+   },
+   {
+    "title": "Sächsisches Ladenöffnungsgesetz (SächsLadÖffG) — Fassung 1. Dezember 2020",
+    "url": "https://www.revosax.sachsen.de/vorschrift/11548-Saechsisches-Ladenoeffnungsgesetz"
+   },
+   {
+    "title": "Sächsisches Gaststättengesetz (SächsGastG) — Fassung 25. Mai 2018",
+    "url": "https://www.revosax.sachsen.de/vorschrift/12033-Saechsisches-Gaststaettengesetz"
+   },
+   {
+    "title": "Sächsisches Nichtraucherschutzgesetz (SächsNSG) — Fassung 26. Juli 2018",
+    "url": "https://www.revosax.sachsen.de/vorschrift/9706-Saechsisches-Nichtraucherschutzgesetz"
+   }
+  ]
+ },
+ {
+  "date": "2026-07-28T13:40:16.551Z",
+  "neu": 9,
+  "geaendert": 0,
+  "entfallen": 0,
+  "beispieleNeu": [
+   {
+    "title": "BayLadSchlG: Bayerisches Ladenschlussgesetz (BayLadSchlG) Vom 25. Juli 2025 (GVBl. S. 246) BayRS 8050-20-A (Art. 1–13) - Bürgerservice",
+    "url": "https://www.gesetze-bayern.de/Content/Document/BayLadSchlG/true"
+   },
+   {
+    "title": "BayGastV: Bayerische Verordnung zur Ausführung des Gaststättengesetzes (Bayerische Gaststättenverordnung – BayGastV) Vom 23. Februar 2016 (GVBl. S. 39) BayRS 7130-1-L (§§ 1–10) - Bürgerservice",
+    "url": "https://www.gesetze-bayern.de/Content/Document/BayGastV/true"
+   },
+   {
+    "title": "GSG: Gesetz zum Schutz der Gesundheit (Gesundheitsschutzgesetz – GSG) Vom 23. Juli 2010 (GVBl. S. 314) BayRS 2126-3-G (Art. 1–11) - Bürgerservice",
+    "url": "https://www.gesetze-bayern.de/Content/Document/BayGSG/true"
+   },
+   {
+    "title": "30.03.2018 Gesetz zur Regelung der Ladenöffnungszeiten (Ladenöffnungsgesetz - LÖG NRW) | RECHT.NRW.DE",
+    "url": "https://recht.nrw.de/lrgv/gesetz/30032018-gesetz-zur-regelung-der-ladenoeffnungszeiten-ladenoeffnungsgesetz-loeg-nrw/"
+   },
+   {
+    "title": "30.04.2005 Verordnung zur Ausführung des Gaststättengesetzes (Gaststättenverordnung -GastV) | RECHT.NRW.DE",
+    "url": "https://recht.nrw.de/lrgv/rechtsverordnung/30042005-verordnung-zur-ausfuehrung-des-gaststaettengesetzes/"
+   },
+   {
+    "title": "01.05.2013 Gesetz zum Schutz von Nichtraucherinnen und Nichtrauchern in Nordrhein-Westfalen (Nichtraucherschutzgesetz NRW – NiSchG NRW) | RECHT.NRW.DE",
+    "url": "https://recht.nrw.de/lrgv/gesetz/01052013-gesetz-zum-schutz-von-nichtraucherinnen-und-nichtrauchern-nordrhein-westfalen/"
+   },
+   {
+    "title": "Sächsisches Ladenöffnungsgesetz",
+    "url": "https://www.revosax.sachsen.de/vorschrift/11548-Saechsisches-Ladenoeffnungsgesetz"
+   },
+   {
+    "title": "Sächsisches Gaststättengesetz",
+    "url": "https://www.revosax.sachsen.de/vorschrift/12033-Saechsisches-Gaststaettengesetz"
+   },
+   {
+    "title": "Sächsisches Nichtraucherschutzgesetz",
+    "url": "https://www.revosax.sachsen.de/vorschrift/9706-Saechsisches-Nichtraucherschutzgesetz"
+   }
+  ],
+  "beispieleGeaendert": []
+ },
+ {
   "date": "2026-07-28T11:38:11.857Z",
   "neu": 0,
   "geaendert": 0,

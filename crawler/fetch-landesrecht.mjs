@@ -204,10 +204,16 @@ for (const doc of DOCS) {
     (out[doc.quelle] = out[doc.quelle] || []).push({
       url: r.url, finalUrl: r.url, kind: 'content', from: `(landesrecht/${q.key})`,
       fetchedAt: new Date().toISOString(),
-      title: `${doc.kurz}${r.stand ? ` — Fassung ${r.stand}` : ''}`, h1: r.title,
+      // build-register bevorzugt h1 VOR title (build-register.mjs:286) – der
+      // kuratierte Name muss deshalb auch ins h1. Der rohe Portaltitel wäre
+      // als Anzeige unbrauchbar („… - Bürgerservice", „30.03.2018 … |
+      // RECHT.NRW.DE") und würde die Norm unter ihrem geläufigen Namen nicht
+      // auffindbar machen; er bleibt zur Nachvollziehbarkeit in description.
+      title: `${doc.kurz}${r.stand ? ` — Fassung ${r.stand}` : ''}`,
+      h1: `${doc.kurz}${r.stand ? ` — Fassung ${r.stand}` : ''}`,
       description: `Amtliche geltende Fassung (${q.land}). Landesrecht — über ` +
-        `gesetze-im-internet.de nicht erreichbar. Quelle: ${q.host}. ` +
-        `Amtliches Werk, § 5 UrhG.`,
+        `gesetze-im-internet.de nicht erreichbar. Amtlicher Titel: ${r.title}. ` +
+        `Quelle: ${q.host}. Amtliches Werk, § 5 UrhG.`,
       date: r.stand, text: r.text,
     });
     console.log(`OK ${q.land} ${doc.id}: ${r.text.length} Zeichen — ${doc.kurz}${r.stand ? ` (${r.stand})` : ''}`);
