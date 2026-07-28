@@ -89,7 +89,8 @@ function topicOf(u) {
   // filterbar und – weil server.mjs den Primärquellen-Boost über das Topic
   // vergibt – strukturell unterhalb jedes Bundesgesetzes, das sie nur zitiert
   // (Fund lokale Session 2026-07-28 am Live-Register).
-  if (host === 'gesetze-bayern.de' || host === 'recht.nrw.de' || host === 'revosax.sachsen.de') {
+  if (host === 'gesetze-bayern.de' || host === 'recht.nrw.de' || host === 'revosax.sachsen.de'
+    || host === 'bravors.brandenburg.de') {
     return 'Landesrecht (§§)';
   }
   if (host === 'bundesfinanzministerium.de') {
@@ -399,13 +400,22 @@ fs.writeFileSync(path.join(OUT, 'register.js'), `// Generiert von build-register
 fs.writeFileSync(path.join(OUT, 'normen-register.js'),
   `// Generiert von build-register.mjs – §-Karteikarten aller übrigen Gesetze (lazy).\nwindow.STEUER_NORMEN_B64 = "${zlib.gzipSync(JSON.stringify(lazyNorms), { level: 9 }).toString('base64')}";\nwindow.STEUER_NORMEN_COUNT = ${lazyNorms.length};\n`);
 // Korpus in Shards schreiben (corpus.jsonl.gz, corpus-2.jsonl.gz, …):
-// GitHub-Dateigrenze 100 MB UND V8-Stringgrenze (~512 MB join). Grenze pro
-// Shard ~200 MB roh ≈ 40–55 MB gz. Alte Shards vorher entfernen, sonst lädt
-// der Server verwaiste Reste.
+// GitHub-Dateigrenze 100 MB UND V8-Stringgrenze (~512 MB join). Alte Shards
+// vorher entfernen, sonst lädt der Server verwaiste Reste.
+//
+// 100 MB roh ≈ 20–28 MB gz (gemessene Kompression ~3,9:1). Vorher standen hier
+// 200 MB roh ≈ 40–55 MB gz – damit hatte corpus-10 am 2026-07-28 bereits
+// 50,9 MB erreicht und GitHub warnte beim Push („larger than the recommended
+// maximum file size of 50.00 MB"). Der Korpus wächst mit jedem Wochenlauf
+// (zuletzt +1768 Chunks), also wäre die harte 100-MB-Grenze absehbar gerissen
+// und der Push GESCHEITERT – ein Ausfall, der erst beim Pushen aufgefallen
+// wäre, nach dem 2-Stunden-Crawl. Halbierte Grenze = doppelte Shard-Zahl
+// (~24 statt 12); server.mjs liest sie per readdir-Regex, die Anzahl ist ihm
+// egal.
 for (const f of fs.readdirSync(OUT)) {
   if (/^corpus(-\d+)?\.jsonl\.gz$/.test(f)) fs.rmSync(path.join(OUT, f));
 }
-const SHARD_RAW_LIMIT = 200 * 1024 * 1024;
+const SHARD_RAW_LIMIT = 100 * 1024 * 1024;
 const shardName = (i) => (i === 0 ? 'corpus.jsonl.gz' : `corpus-${i + 1}.jsonl.gz`);
 let shardLines = [], shardBytes = 0, shardIdx = 0;
 const flushShard = () => {

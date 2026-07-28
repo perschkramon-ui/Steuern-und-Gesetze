@@ -67,6 +67,7 @@ const AUSBAU_QUELLEN = [
   ['gesetze-bayern.de', 'lr-by'],
   ['recht.nrw.de', 'lr-nw'],
   ['revosax.sachsen.de', 'lr-sn'],
+  ['bravors.brandenburg.de', 'lr-bb'],
 ];
 const RESTORE = [
   ['bundesfinanzministerium.de', 'bmf-restored-cache'],

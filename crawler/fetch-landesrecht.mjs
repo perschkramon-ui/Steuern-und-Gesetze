@@ -6,7 +6,8 @@
  * und Gaststättenrecht sind seit der Föderalismusreform Landesrecht und damit
  * über gesetze-im-internet.de NICHT erreichbar.
  *
- * ABDECKUNG (Stand 2026-07-28): Bayern, Nordrhein-Westfalen, Sachsen.
+ * ABDECKUNG (Stand 2026-07-28): Bayern, Nordrhein-Westfalen, Sachsen,
+ * Brandenburg.
  * Alle 16 Landesportale wurden einzeln auf robots.txt geprüft – die Grenze ist
  * NICHT technischer Aufwand:
  *
@@ -17,17 +18,14 @@
  *   landesrecht.rlp.de, recht.saarland.de, landesrecht.sachsen-anhalt.de,
  *   gesetze-rechtsprechung.sh.juris.de, landesrecht.thueringen.de.
  *
- *   ERLAUBT, aber OHNE stabile Direkt-URLs (3) – hier fehlt nicht die
+ *   ERLAUBT, aber OHNE stabile Direkt-URLs (2) – hier fehlt nicht die
  *   Erlaubnis, sondern ein verlässlicher Anker; Discovery ginge nur über
  *   Session-/JS-Handling, das ein schlanker Crawler nicht tragen sollte:
- *     bravors.brandenburg.de – robots erlaubt (Crawl-delay 20!), aber
- *       geratene Pfade liefern 37-Byte-Stubs, der Fundstellennachweis
- *       verlinkt nicht direkt, die POST-Schnellsuche antwortet 302 (Session).
- *     nds-voris.de – kein robots.txt (= erlaubt), aber keine Sitemap und
- *       /search läuft ins 404: Wolters-Kluwer-App, clientseitig.
+ *     nds-voris.de – kein robots.txt (= erlaubt), aber keine Sitemap;
+ *       /search und /browse laufen ins 404 (clientseitige Wolters-Kluwer-App).
  *     transparenz.bremen.de – leeres robots.txt (= erlaubt), Vorschriften nur
- *       über sixcms-Suchparameter erreichbar.
- *   Für diese drei und die gesperrten zehn bleibt der Ausweichweg über die
+ *       über sixcms-Suchparameter erreichbar, Übersichtsseite ohne gsid-Links.
+ *   Für diese zwei und die gesperrten zehn bleibt der Ausweichweg über die
  *   Gesetz- und Verordnungsblätter (PDF auf landeseigenen Servern) oder
  *   Link-only-Einträge – bewusst als eigener Schritt, nicht hier.
  *
@@ -51,7 +49,14 @@
  *           Fassung („Rechtsbereinigt mit Stand vom …"). Achtung: revosax
  *           liefert KEIN <title>-Element – der Name steht nur im <h1>.
  *
- * Schreibt <root>/lr-by-cache, lr-nw-cache, lr-sn-cache.
+ *   BB      bravors.brandenburg.de – robots erlaubt, aber mit „Crawl-delay: 20"
+ *           (wird eingehalten, s. delayMs). Stabile URL /gesetze/<kürzel>,
+ *           Kürzel kleingeschrieben ohne Umlaute (bbgloeg, bbggastg,
+ *           bbgnirschg). ACHTUNG: das Portal antwortet auf JEDE geratene URL
+ *           mit HTTP 200 – ein „404" kommt als 37-Byte-Stub. Der Status ist
+ *           dort wertlos, geprüft wird über Titel und Textlänge.
+ *
+ * Schreibt <root>/lr-by-cache, lr-nw-cache, lr-sn-cache, lr-bb-cache.
  *
  * Rechtlich: Landesgesetze und -verordnungen sind amtliche Werke (§ 5 UrhG),
  * gemeinfrei. Als Anzeige-Link kommt die amtliche Portal-URL ins Register.
@@ -100,12 +105,19 @@ const DOCS = [
   { quelle: 'sn', id: '11548-Saechsisches-Ladenoeffnungsgesetz', pruef: 'Ladenöffnungsgesetz', kurz: 'Sächsisches Ladenöffnungsgesetz (SächsLadÖffG)' },
   { quelle: 'sn', id: '12033-Saechsisches-Gaststaettengesetz', pruef: 'Gaststättengesetz', kurz: 'Sächsisches Gaststättengesetz (SächsGastG)' },
   { quelle: 'sn', id: '9706-Saechsisches-Nichtraucherschutzgesetz', pruef: 'Nichtraucherschutzgesetz', kurz: 'Sächsisches Nichtraucherschutzgesetz (SächsNSG)' },
+  // --- Brandenburg (Kürzel kleingeschrieben ohne Umlaute im Pfad) ---
+  { quelle: 'bb', id: 'bbgloeg', pruef: 'Ladenöffnungsgesetz', kurz: 'Brandenburgisches Ladenöffnungsgesetz (BbgLöG)' },
+  { quelle: 'bb', id: 'bbggastg', pruef: 'Gaststättengesetz', kurz: 'Brandenburgisches Gaststättengesetz (BbgGastG)' },
+  { quelle: 'bb', id: 'bbgnirschg', pruef: 'Passivrauchen', kurz: 'Brandenburgisches Nichtraucherschutzgesetz (BbgNiRSchG)' },
 ];
 
 const QUELLEN = {
   by: { key: 'lr-by', host: 'gesetze-bayern.de', land: 'Bayern' },
   nw: { key: 'lr-nw', host: 'recht.nrw.de', land: 'Nordrhein-Westfalen' },
   sn: { key: 'lr-sn', host: 'revosax.sachsen.de', land: 'Sachsen' },
+  // Brandenburg schreibt in seiner robots.txt „Crawl-delay: 20" – die halten
+  // wir ein (delayMs), auch wenn es den Lauf um gut eine Minute verlängert.
+  bb: { key: 'lr-bb', host: 'bravors.brandenburg.de', land: 'Brandenburg', delayMs: 20000 },
 };
 
 async function get(url) {
@@ -189,7 +201,27 @@ async function fetchSn(doc) {
   };
 }
 
-const HOLER = { by: fetchBy, nw: fetchNw, sn: fetchSn };
+async function fetchBb(doc) {
+  // BRAVORS liefert auf JEDE geratene URL HTTP 200 – ein 404 kommt als
+  // 37-Byte-Stub, nicht als Fehlerstatus (gemessen 2026-07-28: /gesetze/
+  // quatschunsinn123 → 200). Der Status ist hier also WERTLOS; die Prüfung
+  // läuft ausschließlich über Titel und Textlänge.
+  const url = `https://bravors.brandenburg.de/gesetze/${doc.id}`;
+  const { html, finalUrl } = await get(url);
+  const title = pick(/<title[^>]*>([\s\S]*?)<\/title>/i, html);
+  if (!new RegExp(doc.pruef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(title)) {
+    throw new Error(`Titel nennt "${doc.pruef}" nicht – Kürzel geändert oder Stub? (${title.slice(0, 90)})`);
+  }
+  return {
+    url: finalUrl, title,
+    // BRAVORS nennt zuerst das Ausfertigungsdatum, danach „zuletzt geändert".
+    stand: pick(/zuletzt geändert[\s\S]{0,200}?vom\s+(\d{1,2}\.\s*\w+\s+\d{4})/i, html) ||
+      pick(/vom\s+(\d{1,2}\.\s*\w+\s+\d{4})/i, html),
+    text: zuText(html),
+  };
+}
+
+const HOLER = { by: fetchBy, nw: fetchNw, sn: fetchSn, bb: fetchBb };
 
 const out = {};
 let nErr = 0;
@@ -197,7 +229,9 @@ for (const doc of DOCS) {
   // Per-Dokument robust wie in fetch-eu-recht.mjs: ein einzelner Ausfall darf
   // die übrigen Länder nicht mitreißen; der Bestand bleibt über data/ + Restore.
   try {
-    await sleep(DELAY);
+    // Quellenspezifische Wartezeit: Brandenburg fordert in seiner robots.txt
+    // „Crawl-delay: 20" – das halten wir ein, statt pauschal DELAY zu nehmen.
+    await sleep(QUELLEN[doc.quelle].delayMs || DELAY);
     const r = await HOLER[doc.quelle](doc);
     if (r.text.length < 2000) throw new Error(`nur ${r.text.length} Zeichen Text – Fehlerseite statt Norm?`);
     const q = QUELLEN[doc.quelle];
