@@ -175,7 +175,16 @@ const stmtBody = fdb.prepare('SELECT body FROM docs WHERE rowid = ?');
 // Rechtsprechungstreffern begraben werden (Fund 2026-07-21: § 147 AO rankte
 // auf Rang 8 hinter 5 Sekundärquellen). Greift NUR bei ausdrücklicher
 // §-Nennung; ohne §-Zitat bleibt das reine BM25-Ranking unverändert.
-const STATUTE_TOPICS = new Set(['Bundesrecht (§§)', 'Steuergesetze (§§)']);
+// EU-Recht und Landesrecht gehören hier hinein: sie SIND Primärrecht, nicht
+// Sekundärliteratur. Ohne sie rankte die DSGVO bei „Datenschutz-Grundverordnung
+// Artikel 6 Rechtmäßigkeit der Verarbeitung" hinter StBerG § 11, IRegBV § 22
+// und EuWO Anlage 16 – also hinter deutschen Vorschriften, die sie lediglich
+// ZITIEREN, während der maßgebliche Rechtsakt selbst nicht in den Treffern
+// stand (am Live-Register gemessen, lokale Session 2026-07-28). Dasselbe galt
+// für die Landesnormen zu Ladenöffnung/Gaststätten/Nichtraucherschutz.
+const STATUTE_TOPICS = new Set([
+  'Bundesrecht (§§)', 'Steuergesetze (§§)', 'Landesrecht (§§)', 'EU-Recht (EUR-Lex)',
+]);
 const ROMAN = { i: '1', ii: '2', iii: '3', iv: '4', v: '5', vi: '6', vii: '7', viii: '8', ix: '9', x: '10', xi: '11', xii: '12', xiii: '13' };
 const normLaw = (s) => fold(s).replace(/\b([ivx]+)\b/g, (m, r) => ROMAN[r] || m).replace(/[^a-z0-9]/g, '');
 function citedParagraphNumbers(question) {
