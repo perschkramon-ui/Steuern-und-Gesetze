@@ -51,13 +51,26 @@ const isTaxRelevant = (title, abbrev) => {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// 60 s gelten als STILLSTANDS-Timeout, NICHT als Gesamtdauer: der Timer wird bei
+// jedem empfangenen Datenblock neu gestellt. Ein fester Gesamt-Timeout deckelte
+// große amtliche Gesamtausgaben still ab – passv_2007/xml.zip ist mit 23 MB
+// (Musterpass-Anlagen) rund 4000-mal größer als eine normale Verordnung (5,5 kB)
+// und lief bei normaler Bandbreite reproduzierbar in den Abbruch, jeder Retry in
+// dieselbe Wand. Der Verlust (52 Korpus-Chunks) fiel im Zähler-Gate NICHT auf,
+// weil Zuwächse anderer Quellen ihn überdeckten – Fehlerklasse „stiller Deckel",
+// gefunden lokale Session 2026-07-28.
+const STALL_MS = 60000;
+
 async function fetchRaw(url, asBuffer, attempt = 1) {
   const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), 60000);
+  let t = setTimeout(() => ctl.abort(), STALL_MS);
+  const bump = () => { clearTimeout(t); t = setTimeout(() => ctl.abort(), STALL_MS); };
   try {
     const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: ctl.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status} für ${url}`);
-    return Buffer.from(await res.arrayBuffer());
+    const chunks = [];
+    for await (const chunk of res.body) { chunks.push(Buffer.from(chunk)); bump(); }
+    return Buffer.concat(chunks);
   } catch (e) {
     if (attempt >= 4) throw e;
     const wait = 2000 * 2 ** (attempt - 1);

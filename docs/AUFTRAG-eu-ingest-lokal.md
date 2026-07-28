@@ -38,10 +38,20 @@ git checkout main && git fetch origin && git pull --ff-only origin main
 ```bash
 node -e "console.log(require('./data/register.json').meta.counts)"
 ```
-Erwartete Baseline (Stand 2026-07-18, `korpusChunks 917943`):
-`gesetzeIndex 6123 · normen 4997 · normenNurKorpus 102583 · seiten 8908 ·
-pdfs 7424 · urteile 83497 · kommend 220 · korpusChunks 917943`.
-EU-Chunks (Quelle `eur-lex.europa.eu`) bisher **~270** — die müssen steigen.
+Baseline nach dem EU-Ingest (Stand 2026-07-28, `korpusChunks 919711`):
+`gesetzeIndex 6122 · normen 4993 · normenNurKorpus 102704 · seiten 8918 ·
+pdfs 7424 · urteile 83618 · kommend 229 · korpusChunks 919711`.
+EU-Chunks (Quelle `eur-lex.europa.eu`): **959** (vorher ~270).
+
+Vorherige Baseline (2026-07-18) war `gesetzeIndex 6123 · normen 4997 ·
+normenNurKorpus 102583 · seiten 8908 · urteile 83497 · kommend 220 ·
+korpusChunks 917943`. `gesetzeIndex −1` und `normen −4` sind amtlich begründet,
+nicht Datenverlust: GII hat 7 obsolete Vertragsgesetze aus dem Vollindex genommen
+(6 neue kamen dazu → netto −1), alle 4 fehlenden Normen gehören zur aufgehobenen
+`StBefrAbkHRVV`. Belegt am 28.07.2026: `fmvtr1973g`, `grabfertvtraut1962g`,
+`luftverkusaabkg`, `rhivtrprtg`, `sozsichabkergvbg2frag`, `stbefrabkhrvv` → HTTP
+404; `bmjvertrano_2013` → aus `Teilliste_B.html` entfernt (Seite existiert noch
+verwaist).
 
 ### 3. Rebuild starten (der lange Teil, ~1,5–2 h GII-Crawl)
 ```bash
@@ -62,7 +72,7 @@ NODE_OPTIONS=--max-old-space-size=6144 node crawler/update-all.mjs --skip-bmf tr
 
 ### 4. ZÄHLER-GATE prüfen (VOR dem Push — kein Wert darf sinken)
 ```bash
-node -e "const c=require('./data/register.json').meta.counts; const ref={gesetzeIndex:6123,normen:4997,normenNurKorpus:102583,seiten:8908,pdfs:7424,urteile:83497,kommend:220,korpusChunks:917943}; let ok=true; for(const k in ref){const good=c[k]>=ref[k]; if(!good)ok=false; console.log((good?'OK ':'!! ')+k+': '+c[k]+' (ref '+ref[k]+')');} console.log(ok?'>>> GATE GRÜN':'>>> GATE ROT - NICHT pushen');"
+node -e "const c=require('./data/register.json').meta.counts; const ref={gesetzeIndex:6122,normen:4993,normenNurKorpus:102704,seiten:8918,pdfs:7424,urteile:83618,kommend:229,korpusChunks:919711}; let ok=true; for(const k in ref){const good=c[k]>=ref[k]; if(!good)ok=false; console.log((good?'OK ':'!! ')+k+': '+c[k]+' (ref '+ref[k]+')');} console.log(ok?'>>> GATE GRÜN':'>>> GATE ROT - NICHT pushen');"
 ```
 - **GATE ROT / irgendein `!!`** → NICHT pushen. Ursache diagnostizieren
   (meist: eine Quelle wurde nicht restauriert/gecrawlt → fehlt im Build). Dem
