@@ -6,6 +6,23 @@ Verwaltungsvorschriften, EU-Recht, Rechtsprechung der Bundesgerichte) mit
 strikt quellengebundener KI-Abfrage. Kein Kassen-/Fiskalcode – das ist ein
 eigenständiges Werkzeug des Betreibers („es ist für mich, nicht für andere").
 
+## Globale Regeln zuerst lesen (gilt für JEDE Session, besonders Cloud/Handy)
+
+Die projektübergreifenden Regeln (Token-Policy, Gedächtnis-Pflicht,
+**Fehlerklassen mit Guards**) stehen NICHT hier, sondern im Master-Repo
+`https://github.com/perschkramon-ui/claude-global` — alleinige Quelle.
+
+- **Lokale Sessions** (PC/Laptop) bekommen sie automatisch: ein SessionStart-Hook
+  zieht sie nach `~/.claude/CLAUDE.md`. Nichts zu tun.
+- **Cloud-Sessions** (auch vom Smartphone über claude.ai/code) sehen kein
+  PC-Dateisystem und bekommen sie NUR über diesen Weg — beim Onboarding
+  zusätzlich zu diesem Repo holen und als globale Regeln lesen:
+  ```bash
+  gh repo clone perschkramon-ui/claude-global
+  ```
+  Ohne diesen Schritt arbeitet die Session ohne die Fehlerklassen — genau die
+  Guards, die hier am 28.07.2026 drei stille Datenverluste aufgedeckt haben.
+
 ## Repo-Trennung (Betreiber 2026-07-16 – DAUERHAFT)
 
 Dieses Repo wurde am 2026-07-16 aus `perschkramon-ui/Kassensystem`
